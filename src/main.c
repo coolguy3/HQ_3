@@ -13,13 +13,13 @@ uint8_t send_data_cnt = 0;
 //**************1ms定时中断*****************
 static void PIT0_ISR(void)
 {
-//		static uint8_t IMU_3ms = 0;
-//		IMU_3ms++;
-//		if(IMU_3ms == 3)
-//		{
-//			IMU_3ms = 0;
-//			IMU_Update();   //有 串口IMU_Report，耗时在2~2.5ms之间
-//		}
+		static uint8_t IMU_5ms = 0;
+		IMU_5ms++;
+		if(IMU_5ms == 5)
+		{
+			IMU_5ms = 0;
+			IMU_Update();   //有 串口IMU_Report，耗时在2~2.5ms之间
+		}
 }
 
 //**************0.2ms定时中断***************
@@ -63,19 +63,19 @@ int main(void)
 	UART_SetTxFIFOWatermark(HW_UART0, UART_GetTxFIFOSize(HW_UART0));
 
 	//***********初始化模拟IIC: SDA--E24 SCL--E25 、陀螺仪、加速度计******
-//	IMU_Init();		
+	IMU_Init();		
 
 	//***********初始化PIT模块***********************
 	PIT_QuickInit(HW_PIT_CH0, 1*1000);				 //定时1ms
 	PIT_CallbackInstall(HW_PIT_CH0, PIT0_ISR); //PIT0_ISR是自定义中断函数名
 	PIT_ITDMAConfig(HW_PIT_CH0, kPIT_IT_TOF,ENABLE);
 
-	PIT_QuickInit(HW_PIT_CH1, 1*200);				 	 //定时0.2ms
-	PIT_CallbackInstall(HW_PIT_CH1, PIT1_ISR); 
-	PIT_ITDMAConfig(HW_PIT_CH1, kPIT_IT_TOF,ENABLE);
+//	PIT_QuickInit(HW_PIT_CH1, 1*200);				 	 //定时0.2ms
+//	PIT_CallbackInstall(HW_PIT_CH1, PIT1_ISR); 
+//	PIT_ITDMAConfig(HW_PIT_CH1, kPIT_IT_TOF,ENABLE);
 	
 	//***********初始化 SI--E4 CLK--E5 、ADC0_SE6B_PD5 8bits精度**********
-	CCD_Init(); 
+//	CCD_Init(); 
 	
 	while(1)
 	{

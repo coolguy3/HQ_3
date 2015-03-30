@@ -24,11 +24,13 @@ float  Acc_Z_Filtered = 0.0;
 
 float Ang_Acc = 0.0;			//根据加速度算出的角度
 float Ang = 0.0;					//互补滤波后的角度
-
+float Gyro_v = 0.0;
 
 /*	
 	Q:过程噪声，Q增大，动态响应变快，收敛稳定性变坏
 	R:测量噪声，R增大，动态响应变慢，收敛稳定性变好	
+	0.02
+	6.0000
 */
 
 #define KALMAN_Q        0.02
@@ -278,25 +280,23 @@ void IMU_Filter(int16_t * GX, int16_t * GY, int16_t * GZ, int16_t * AX, int16_t 
 	int i=0;
 	float sum1=0,sum2=0,sum3=0;
 	
-	Filter_Buf[0][num] = * GX;
+	//滑动平均滤波
+//	Filter_Buf[0][num] = * GX;
 	Filter_Buf[1][num] = * GY;
-	Filter_Buf[2][num] = * GZ;
-
+//	Filter_Buf[2][num] = * GZ;
 	for(i=0;i<10;i++)
 	{
-     sum1 += Filter_Buf[0][i];
+//     sum1 += Filter_Buf[0][i];
 		 sum2 += Filter_Buf[1][i];
-		 sum3 += Filter_Buf[2][i];
+//		 sum3 += Filter_Buf[2][i];
   }
-	
-	Gyro_X_Filtered = ( sum1 / 10.0 ) - Gx_Offset;
+//	Gyro_X_Filtered = ( sum1 / 10.0 ) - Gx_Offset;	//在IMU_Init()初始化零偏
 	Gyro_Y_Filtered = ( sum2 / 10.0 ) - Gy_Offset;
-	Gyro_Z_Filtered = ( sum3 / 10.0 ) - Gz_Offset;
-
+//	Gyro_Z_Filtered = ( sum3 / 10.0 ) - Gz_Offset;
 	num = (num + 1) % 10;
 	
 	Acc_X_Filtered = KalmanFilter_x( *AX, KALMAN_Q, KALMAN_R );  // ACC X轴卡尔曼滤波  
-	Acc_Y_Filtered = KalmanFilter_y( *AY, KALMAN_Q, KALMAN_R );  // ACC Y轴卡尔曼滤波  
+//	Acc_Y_Filtered = KalmanFilter_y( *AY, KALMAN_Q, KALMAN_R );  // ACC Y轴卡尔曼滤波  
 	Acc_Z_Filtered = KalmanFilter_z( *AZ, KALMAN_Q, KALMAN_R );  // ACC Z轴卡尔曼滤波 
 
 }
@@ -366,7 +366,9 @@ void IMU_Report_Ang(float * GX, float * GY)
 	UART_WriteByte(HW_UART0, 0x03);
 
 }
-//*********************初始化姿态模块 **********************
+
+#define ANG_TO_RAD 57.295779513	//	180/3.141592
+//*********************读取数据、滤波、算出角度**********************
 void IMU_Update(void)
 {
 //	float temp[6] = {0};
@@ -386,8 +388,9 @@ void IMU_Update(void)
 	
 	IMU_Filter(&Gyro_X,&Gyro_Y,&Gyro_Z,&Acc_X,&Acc_Y,&Acc_Z);
 	
-	Ang_Acc = atan2(Acc_Z_Filtered,Acc_X_Filtered)* 180 / 3.141592;    //得到角度 求z/x的反正切，本来应右移四位根据不同量程乘上转换系数,这里刚好约去
-	Ang = 0.98 * ( Ang + (Gyro_Y_Filtered * 70 * 0.003 * 0.001) )	+ 0.02 * Ang_Acc; //2000dps  70 mdps/digit  周期3ms
+	Ang_Acc = atan2(Acc_Z_Filtered,Acc_X_Filtered) * ANG_TO_RAD;    //弧度转成角度 求z/x的反正切，本来应右移四位根据不同量程乘上转换系数,这里刚好分母分子约去
+	Gyro_v = Gyro_Y_Filtered * 0.07;	//	70mdps/digit	算得角速度，直立PID用到
+	Ang = 0.98 * ( Ang + (Gyro_v * 0.005) )	+ 0.02 * Ang_Acc; //  采集周期5ms		互补滤波
 	IMU_Report_Ang(&Ang_Acc,&Ang);    
 	
 //	IMU_Report(&Gyro_X_Filtered,&Gyro_Y_Filtered,&Gyro_Z_Filtered,&Acc_X_Filtered,&Acc_Y_Filtered,&Acc_Z_Filtered);
