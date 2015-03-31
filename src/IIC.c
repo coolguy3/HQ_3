@@ -10,12 +10,8 @@ void Delay(uint32_t time)
 //初始化IIC
 void IIC_Init(void)
 {					     
-// 	RCC->APB2ENR|=1<<4;//先使能外设IO PORTC时钟 							 
-//	GPIOC->CRH&=0XFFF00FFF;//PC11/12 推挽输出
-//	GPIOC->CRH|=0X00033000;	   
-//	GPIOC->ODR|=3<<11;     //PC11,12 输出高
-	GPIO_QuickInit(HW_GPIOE, 24, kGPIO_Mode_OPP);	
-	GPIO_QuickInit(HW_GPIOE, 25, kGPIO_Mode_OPP);
+	GPIO_QuickInit(HW_GPIOC, 10, kGPIO_Mode_OPP);	
+	GPIO_QuickInit(HW_GPIOC, 11, kGPIO_Mode_OPP);
 	IIC_SDA=1;	  	  
 	IIC_SCL=1;
 }

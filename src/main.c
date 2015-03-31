@@ -5,6 +5,7 @@
 #include "IIC.h"
 #include "IMU.h"
 #include "CCD.h"
+#include "PID.h"
 
 uint8_t Pixel[128] = {0};
 uint8_t TIME1flag_20ms = 0 ;
@@ -62,10 +63,10 @@ int main(void)
 	UART_EnableTxFIFO(HW_UART0, true);
 	UART_SetTxFIFOWatermark(HW_UART0, UART_GetTxFIFOSize(HW_UART0));
 
-	//***********初始化模拟IIC: SDA--E24 SCL--E25 、陀螺仪、加速度计******
-	IMU_Init();		
+	//***********初始化模拟IIC: SDA--C11 SCL--C10 、陀螺仪、加速度计******
+	IMU_Init();		//初始化不通过会陷入死循环
 
-	//***********初始化PIT模块***********************
+	//***********初始化PIT定时模块***********************
 	PIT_QuickInit(HW_PIT_CH0, 1*1000);				 //定时1ms
 	PIT_CallbackInstall(HW_PIT_CH0, PIT0_ISR); //PIT0_ISR是自定义中断函数名
 	PIT_ITDMAConfig(HW_PIT_CH0, kPIT_IT_TOF,ENABLE);
@@ -80,7 +81,7 @@ int main(void)
 	while(1)
 	{
 	//		DelayMs(500);
-	//		GPIO_ToggleBit(HW_GPIOA, 17);	
+	//		GPIO_ToggleBit(HW_GPIOA, 17);		//LED反转
 		if(TIME1flag_20ms == 1)
 		{
 			TIME1flag_20ms = 0; 

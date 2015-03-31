@@ -3,13 +3,13 @@
 #include "common.h"
     		   
 //IO方向设置
-#define SDA_IN()  {PTE->PDDR &= ~(1 << 24);}
-#define SDA_OUT() {PTE->PDDR |= (1 << 24);}
+#define SDA_IN()  {PTC->PDDR &= ~(1 << 11);}
+#define SDA_OUT() {PTC->PDDR |= (1 << 11);}
 
 //IO操作函数	 
-#define IIC_SCL    PEout(25) //SCL
-#define IIC_SDA    PEout(24) //SDA	 
-#define READ_SDA   PEin(24)  //输入SDA 
+#define IIC_SCL    PCout(10) //SCL
+#define IIC_SDA    PCout(11) //SDA	 
+#define READ_SDA   PCin(11)  //输入SDA 
 
 //IIC所有操作函数
 void IIC_Init(void);                //初始化IIC的IO口				 

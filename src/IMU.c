@@ -1,6 +1,7 @@
 #include "IIC.h"
 #include "IMU.h"
 #include "uart.h"
+#include "PID.h"
 //#define ARM_MATH_CM4
 //#include "arm_math.h"
 #include "math.h"
@@ -23,8 +24,10 @@ float  Acc_Y_Filtered = 0.0;
 float  Acc_Z_Filtered = 0.0;
 
 float Ang_Acc = 0.0;			//根据加速度算出的角度
+float Ang_Gyro = 0.0;			//根据陀螺仪算出的角度
 float Ang = 0.0;					//互补滤波后的角度
 float Gyro_v = 0.0;
+struct Quad_PID PID_Stand;
 
 /*	
 	Q:过程噪声，Q增大，动态响应变快，收敛稳定性变坏
@@ -271,6 +274,10 @@ void IMU_Init(void)
 	while( Init_L3G4200D() )	{	DelayMs(10); }	//初始化L3G4200D
 	DelayMs(100);
 	L3G4200D_InitGyro_Offset();
+	pidSetTarget(&PID_Stand,40.0);	//设置车直立的倾角
+	pidSetKp(&PID_Stand, 0.0);			
+	pidSetKi(&PID_Stand, 0.0);
+	pidSetKd(&PID_Stand, 0.0);
 }
 
 //*********************陀螺仪传感器值的滑动平均滤波、加速度计传感器值的卡尔曼滤波**********************
@@ -371,7 +378,7 @@ void IMU_Report_Ang(float * GX, float * GY)
 //*********************读取数据、滤波、算出角度**********************
 void IMU_Update(void)
 {
-//	float temp[6] = {0};
+	float temp[6] = {0};
 
 	if( ((IIC_Single_Read(L3G4200D_SlaveAddress,L3G4200D_STATUS_REG) & 0x08)>>3) == 1) //陀螺新数据到来
 		Read_L3G4200D(&Gyro_X,&Gyro_Y,&Gyro_Z);  //读数据 
@@ -390,8 +397,11 @@ void IMU_Update(void)
 	
 	Ang_Acc = atan2(Acc_Z_Filtered,Acc_X_Filtered) * ANG_TO_RAD;    //弧度转成角度 求z/x的反正切，本来应右移四位根据不同量程乘上转换系数,这里刚好分母分子约去
 	Gyro_v = Gyro_Y_Filtered * 0.07;	//	70mdps/digit	算得角速度，直立PID用到
-	Ang = 0.98 * ( Ang + (Gyro_v * 0.005) )	+ 0.02 * Ang_Acc; //  采集周期5ms		互补滤波
-	IMU_Report_Ang(&Ang_Acc,&Ang);    
+	Ang = 0.98 *  (Ang + Gyro_v * 0.005) 	+ 0.02 * Ang_Acc; // 采集周期5ms	 	互补滤波
+//	PID_Stand_Update(&PID_Stand, Ang);
+	
+	temp[0] = Ang - 0.02 * Ang_Acc;	
+	IMU_Report_Ang(temp,&Ang);    
 	
 //	IMU_Report(&Gyro_X_Filtered,&Gyro_Y_Filtered,&Gyro_Z_Filtered,&Acc_X_Filtered,&Acc_Y_Filtered,&Acc_Z_Filtered);
 //	temp[0] = (float)Gyro_X;
