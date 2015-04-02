@@ -1,5 +1,6 @@
-#ifndef __IMU_H
-#define __IMU_H
+#ifndef __IMU_H__
+#define __IMU_H__
+
 #include "common.h"
 
 
@@ -92,7 +93,7 @@ uint8_t IIC_Single_Read(uint8_t IIC_Address,uint8_t REG_Address);               
 void IIC_Single_Write(uint8_t IIC_Address,uint8_t REG_Address,uint8_t REG_data);  //发起IIC单字节写协议
 void IMU_Init(void);
 void IMU_Update(void);
-void IMU_Filter(int16_t * GX, int16_t * GY, int16_t * GZ, int16_t * AX, int16_t * AY, int16_t * AZ);
+void IMU_Filter(int16_t * GY, int16_t * AX, int16_t * AZ);
 void IMU_Report(float * GX, float * GY, float * GZ, float * AX, float * AY, float * AZ);
 	
 #endif

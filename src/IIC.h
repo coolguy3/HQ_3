@@ -1,5 +1,6 @@
-#ifndef __MYIIC_H
-#define __MYIIC_H
+#ifndef __MYIIC_H__
+#define __MYIIC_H__
+
 #include "common.h"
     		   
 //IO∑ΩœÚ…Ë÷√
@@ -26,19 +27,5 @@ void IIC_Write_One_Byte(uint8_t daddr,uint8_t addr,uint8_t data);
 uint8_t IIC_Read_One_Byte(uint8_t daddr,uint8_t addr);	  
 
 #endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

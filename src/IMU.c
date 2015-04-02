@@ -2,10 +2,13 @@
 #include "IMU.h"
 #include "uart.h"
 #include "PID.h"
+#include "UART_DMA.h"
+
 //#define ARM_MATH_CM4
 //#include "arm_math.h"
 #include "math.h"
-int32_t Filter_Buf[6][10] = {0};			//滑动平均滤波缓存数组
+
+int32_t Filter_Buf[10] = {0};			//滑动平均滤波缓存数组
 int16_t Gx_Offset=0,Gy_Offset=0,Gz_Offset=0;		//陀螺仪的零偏
 int16_t Gyro_X = 0;
 int16_t Gyro_Y = 0;
@@ -26,7 +29,7 @@ float  Acc_Z_Filtered = 0.0;
 float Ang_Acc = 0.0;			//根据加速度算出的角度
 float Ang_Gyro = 0.0;			//根据陀螺仪算出的角度
 float Ang = 0.0;					//互补滤波后的角度
-float Gyro_v = 0.0;
+float Gyro_v = 0.0;				//陀螺仪Y轴角速度
 struct Quad_PID PID_Stand;
 
 /*	
@@ -61,28 +64,7 @@ static double KalmanFilter_x(const double ResrcData,double ProcessNiose_Q,double
    x_last = x_now; //更新系统状态值
    return x_now;                
  }
-static double KalmanFilter_y(const double ResrcData,double ProcessNiose_Q,double MeasureNoise_R)
-{
-   double R = MeasureNoise_R;
-   double Q = ProcessNiose_Q;
-   static double x_last;
-   double x_mid = x_last;
-   double x_now;
-   static double p_last;
-   double p_mid ;
-   double p_now;
-   double kg;        
 
-   x_mid=x_last; //x_last=x(k-1|k-1),x_mid=x(k|k-1)
-   p_mid=p_last+Q; //p_mid=p(k|k-1),p_last=p(k-1|k-1),Q=噪声
-   kg=p_mid/(p_mid+R); //kg为kalman filter，R为噪声
-   x_now=x_mid+kg*(ResrcData-x_mid);//估计出的最优值
-                
-   p_now=(1-kg)*p_mid;//最优值对应的covariance       
-   p_last = p_now; //更新covariance值
-   x_last = x_now; //更新系统状态值
-   return x_now;                
- }
 static double KalmanFilter_z(const double ResrcData,double ProcessNiose_Q,double MeasureNoise_R)
 {
    double R = MeasureNoise_R;
@@ -105,7 +87,7 @@ static double KalmanFilter_z(const double ResrcData,double ProcessNiose_Q,double
    x_last = x_now; //更新系统状态值
    return x_now;                
  }
-//******** IIC 单字节写 *************************
+/******** IIC 单字节写 *************************/
 void IIC_Single_Write(uint8_t IIC_Address,uint8_t REG_Address,uint8_t REG_data)
 {
     IIC_Start();                    //起始信号
@@ -115,7 +97,7 @@ void IIC_Single_Write(uint8_t IIC_Address,uint8_t REG_Address,uint8_t REG_data)
     IIC_Stop();                     //发送停止信号
 }
 
-//******** IIC 单字节读取内部寄存器 *************************
+/******** IIC 单字节读取内部寄存器 *************/
 uint8_t IIC_Single_Read(uint8_t IIC_Address,uint8_t REG_Address)
 {  
     uint8_t REG_data;
@@ -130,7 +112,7 @@ uint8_t IIC_Single_Read(uint8_t IIC_Address,uint8_t REG_Address)
     return REG_data; 
 }
  
-//*******读 MMA8452 数据************************** 
+/********读 MMA8452 数据*************************/ 
 void Read_MMA8452(int16_t *AX,int16_t *AY,int16_t *AZ)
 {   
     uint8_t i;
@@ -171,7 +153,7 @@ void Read_MMA8452(int16_t *AX,int16_t *AY,int16_t *AZ)
 		}
 }
 
-//*******读 L3G4200D 数据************************** 
+/********读 L3G4200D 数据*************************/ 
 void Read_L3G4200D(int16_t *GX,int16_t *GY,int16_t *GZ)
 {   
 	uint8_t xMSB,xLSB,yMSB,yLSB,zMSB,zLSB;
@@ -192,7 +174,7 @@ void Read_L3G4200D(int16_t *GX,int16_t *GY,int16_t *GZ)
 //	}
 }
 
-//*********************初始化 MMA8452 **********************
+/**********************初始化 MMA8452 *******************/
 uint8_t Init_MMA8452(void)
 {
 	uint8_t i,ret;
@@ -220,7 +202,7 @@ uint8_t Init_MMA8452(void)
 	return 0;
 }
 
-//*********************初始化 L3G4200D **********************
+/**********************初始化 L3G4200D **********************/
 uint8_t Init_L3G4200D(void)
 {
   if(IIC_Single_Read(L3G4200D_SlaveAddress,L3G4200D_WHO_AM_I) != 0xD3) return 1;   //检测不到陀螺，返回1
@@ -233,7 +215,7 @@ uint8_t Init_L3G4200D(void)
 	return 0;
 }
 
-//*********************初始化 L3G4200D 零偏 **********************
+/*********************初始化 L3G4200D 零偏 ******************/
 void L3G4200D_InitGyro_Offset(void)
 {
 	unsigned char i;
@@ -265,7 +247,7 @@ void L3G4200D_InitGyro_Offset(void)
 
 }
 
-//*********************初始化姿态模块 **********************
+/*********************初始化姿态模块 **********************/
 void IMU_Init(void)
 {
 	IIC_Init();
@@ -280,102 +262,27 @@ void IMU_Init(void)
 	pidSetKd(&PID_Stand, 0.0);
 }
 
-//*********************陀螺仪传感器值的滑动平均滤波、加速度计传感器值的卡尔曼滤波**********************
-void IMU_Filter(int16_t * GX, int16_t * GY, int16_t * GZ, int16_t * AX, int16_t * AY, int16_t * AZ)
+/****************陀螺仪传感器值的滑动平均滤波、加速度计传感器值的卡尔曼滤波*******************/
+void IMU_Filter(int16_t * GY, int16_t * AX, int16_t * AZ)
 {
 	static int num = 0;  
 	int i=0;
-	float sum1=0,sum2=0,sum3=0;
+	float sum=0;
 	
 	//滑动平均滤波
-//	Filter_Buf[0][num] = * GX;
-	Filter_Buf[1][num] = * GY;
-//	Filter_Buf[2][num] = * GZ;
+	Filter_Buf[num] = * GY;
 	for(i=0;i<10;i++)
-	{
-//     sum1 += Filter_Buf[0][i];
-		 sum2 += Filter_Buf[1][i];
-//		 sum3 += Filter_Buf[2][i];
-  }
-//	Gyro_X_Filtered = ( sum1 / 10.0 ) - Gx_Offset;	//在IMU_Init()初始化零偏
-	Gyro_Y_Filtered = ( sum2 / 10.0 ) - Gy_Offset;
-//	Gyro_Z_Filtered = ( sum3 / 10.0 ) - Gz_Offset;
+		 sum += Filter_Buf[i];
+	Gyro_Y_Filtered = ( sum / 10.0 ) - Gy_Offset;
 	num = (num + 1) % 10;
 	
-	Acc_X_Filtered = KalmanFilter_x( *AX, KALMAN_Q, KALMAN_R );  // ACC X轴卡尔曼滤波  
-//	Acc_Y_Filtered = KalmanFilter_y( *AY, KALMAN_Q, KALMAN_R );  // ACC Y轴卡尔曼滤波  
+	Acc_X_Filtered = KalmanFilter_x( *AX, KALMAN_Q, KALMAN_R );  // ACC X轴卡尔曼滤波   
 	Acc_Z_Filtered = KalmanFilter_z( *AZ, KALMAN_Q, KALMAN_R );  // ACC Z轴卡尔曼滤波 
 
 }
 
-//*********************回送姿态给上位机**********************
-void IMU_Report(float * GX, float * GY, float * GZ, float * AX, float * AY, float * AZ)
-{
-	UART_WriteByte(HW_UART0, 0x03);		//帧头
-	UART_WriteByte(HW_UART0, 0xfc);
-	
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)GX + 0 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)GX + 1 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)GX + 2 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)GX + 3 ) );
-	
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)GY + 0 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)GY + 1 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)GY + 2 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)GY + 3 ) );
-	
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)GZ + 0 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)GZ + 1 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)GZ + 2 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)GZ + 3 ) );
-	
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)AX + 0 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)AX + 1 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)AX + 2 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)AX + 3 ) );
-	                                        
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)AY + 0 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)AY + 1 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)AY + 2 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)AY + 3 ) );
-	                                        
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)AZ + 0 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)AZ + 1 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)AZ + 2 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)AZ + 3 ) );
-
-	UART_WriteByte(HW_UART0, 0xfc);		//帧尾
-	UART_WriteByte(HW_UART0, 0x03);
-
-}
-
-void IMU_Report_Ang(float * GX, float * GY)
-{
-	float t1,t2;
-	t1 = (*GX) * 10.0;					//在发送前放大十倍
-	t2 = (*GY) * 10.0;
-	
-	UART_WriteByte(HW_UART0, 0x03);		//帧头
-	UART_WriteByte(HW_UART0, 0xfc);
-	
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)&t1 + 0 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)&t1 + 1 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)&t1 + 2 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)&t1 + 3 ) );
-	                                        
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)&t2 + 0 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)&t2 + 1 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)&t2 + 2 ) );
-	UART_WriteByte(HW_UART0, * ( (uint8_t *)&t2 + 3 ) );
-	
-
-	UART_WriteByte(HW_UART0, 0xfc);		//帧尾
-	UART_WriteByte(HW_UART0, 0x03);
-
-}
-
 #define ANG_TO_RAD 57.295779513	//	180/3.141592
-//*********************读取数据、滤波、算出角度**********************
+/*********************读传感器、滤波、算出角度、PID_Stand*********************/
 void IMU_Update(void)
 {
 	float temp[6] = {0};
@@ -393,7 +300,7 @@ void IMU_Update(void)
 	Acc_Y_Last = Acc_Y;
 	Acc_Z_Last = Acc_Z;
 	
-	IMU_Filter(&Gyro_X,&Gyro_Y,&Gyro_Z,&Acc_X,&Acc_Y,&Acc_Z);
+	IMU_Filter(&Gyro_Y,&Acc_X,&Acc_Z);
 	
 	Ang_Acc = atan2(Acc_Z_Filtered,Acc_X_Filtered) * ANG_TO_RAD;    //弧度转成角度 求z/x的反正切，本来应右移四位根据不同量程乘上转换系数,这里刚好分母分子约去
 	Gyro_v = Gyro_Y_Filtered * 0.07;	//	70mdps/digit	算得角速度，直立PID用到
@@ -401,14 +308,7 @@ void IMU_Update(void)
 //	PID_Stand_Update(&PID_Stand, Ang);
 	
 	temp[0] = Ang - 0.02 * Ang_Acc;	
-	IMU_Report_Ang(temp,&Ang);    
+	temp[1] = Ang;   
+	UART_DMA_Array_Width_Six(temp);
 	
-//	IMU_Report(&Gyro_X_Filtered,&Gyro_Y_Filtered,&Gyro_Z_Filtered,&Acc_X_Filtered,&Acc_Y_Filtered,&Acc_Z_Filtered);
-//	temp[0] = (float)Gyro_X;
-//	temp[1] = (float)Gyro_Y;
-//	temp[2] = (float)Gyro_Z;
-//	temp[3] = (float)Acc_X;
-//	temp[4] = (float)Acc_Y;
-//	temp[5] = (float)Acc_Z;
-//	IMU_Report(temp+0,temp+1,temp+2,temp+3,temp+4,temp+5);
 }

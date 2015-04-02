@@ -1,3 +1,5 @@
+#ifndef __PID_H__
+#define __PID_H__
 
 struct Quad_PID
 {
@@ -33,3 +35,4 @@ void pidSetKi(struct Quad_PID* pid, float ki);
 void pidSetKd(struct Quad_PID* pid, float kd);
 void pidSetMeasured(struct Quad_PID* pid, float measured);
 
+#endif

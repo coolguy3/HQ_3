@@ -1,6 +1,11 @@
 #include "CCD.h"
 #include "gpio.h"
 #include "adc.h"
+#include "UART_DMA.h"
+
+uint8_t IntegrationTime = 10;	//曝光时间  
+uint8_t UART_Buffer_CCD[132] = {0};	//存放采集AD值
+uint8_t TIME1flag_20ms = 0 ;	//20ms标志位
 
 //************求均值**************************
 uint8_t PixelAverage(uint8_t len, uint8_t *data) 
@@ -28,11 +33,15 @@ void SamplingDelay(void)
 //*************CCD初始化**********************
 void CCD_Init(void)
 {
-  GPIO_QuickInit(HW_GPIOE, 4, kGPIO_Mode_OPP);	//SI
-	GPIO_QuickInit(HW_GPIOE, 5, kGPIO_Mode_OPP);	//CLK		
-	PEout(4) = 1;
-	PEout(5) = 1;
-	ADC_QuickInit(ADC0_SE6B_PD5, kADC_SingleDiff8or9);	//8位精度
+  GPIO_QuickInit(HW_GPIOC, 4, kGPIO_Mode_OPP);	//SI
+	GPIO_QuickInit(HW_GPIOC, 5, kGPIO_Mode_OPP);	//CLK		
+	PCout(4) = 1;
+	PCout(5) = 1;
+	
+	ADC_QuickInit(ADC1_SE4B_PC8, kADC_SingleDiff8or9);	//8位精度
+
+	UART_Buffer_CCD[0] = 0x02;	UART_Buffer_CCD[1] = 0xfd;			//帧头
+	UART_Buffer_CCD[130] = 0xfd;	UART_Buffer_CCD[131] = 0x02;	//帧尾
 }
 
 //***************CCD启动程序******************
@@ -86,7 +95,7 @@ void ImageCapture(uint8_t * ImageData)
 		SamplingDelay() ;  //200ns                 //把该值改大或者改小达到自己满意的结果。
 	}
 
-	*ImageData =  ADC_QuickReadValue(ADC0_SE6B_PD5);
+	*ImageData =  ADC_QuickReadValue(ADC1_SE4B_PC8);
 	ImageData ++ ;
 	CLK_ClrVal();         /* CLK = 0 */
 	for(i=0; i<127; i++) 
@@ -96,7 +105,7 @@ void ImageCapture(uint8_t * ImageData)
 		CLK_SetVal();       /* CLK = 1 */
 		SamplingDelay();
 		SamplingDelay();
-		*ImageData =  ADC_QuickReadValue(ADC0_SE6B_PD5);
+		*ImageData =  ADC_QuickReadValue(ADC1_SE4B_PC8);
 		ImageData ++ ;
 		CLK_ClrVal();       /* CLK = 0 */
 	}
@@ -110,7 +119,6 @@ void ImageCapture(uint8_t * ImageData)
 }
 
 //***************计算曝光时间，单位ms **************************
-uint8_t IntegrationTime = 10;
 void CalculateIntegrationTime(void) 
 {
 		extern uint8_t Pixel[128];
@@ -120,7 +128,7 @@ void CalculateIntegrationTime(void)
 		int16_t PixelAverageVoltageError = 0;			//偏差
 		int16_t TargetPixelAverageVoltageAllowError = 2;		//死区	！！！
 
-    PixelAverageValue = PixelAverage(128,Pixel);
+    PixelAverageValue = PixelAverage(128,UART_Buffer_CCD + 2);
  //   PixelAverageVoltage = (unsigned char)((int)PixelAverageValue * 25 / 194);
 		PixelAverageVoltage = (unsigned char)( ((int)PixelAverageValue * 33 ) >> 8 );
 	
@@ -258,5 +266,19 @@ void AccommodFondLine(int8_t *PixelAryy ,uint8_t PixelCount , int16_t *LastLeftP
      
 }
 
+void CCD_Report(void)
+{
+		static uint8_t send_data_cnt = 0;		//决定CCD数据发送周期
+		if(TIME1flag_20ms == 1)
+		{
+			TIME1flag_20ms = 0; 
+			if(++send_data_cnt >= 5) 
+			{
+				send_data_cnt = 0;
+				//只要重复调用这个函数就可以发送不同的数组，但必须注意要确保上一次已经发送完
+				while(DMA_IsMajorLoopComplete(DMA_SEND_CH));
+				UART_SendWithDMA(DMA_SEND_CH, (const uint8_t*)UART_Buffer_CCD, sizeof(UART_Buffer_CCD));		
+			}			
+		}
+}
 
- 
