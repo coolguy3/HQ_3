@@ -1,6 +1,7 @@
 #include "PID.h"
+#include "UART_DMA.h"
 
-extern float Gyro_v;
+struct Quad_PID PID_Stand;
 
 void pidInit(struct Quad_PID* pid, float kp,float ki, float kd)
 {
@@ -16,32 +17,32 @@ void pidInit(struct Quad_PID* pid, float kp,float ki, float kd)
   pid->iLimit = DEFAULT_PID_INTEGRATION_LIMIT;
 }
 
-float PID_Stand_Update(struct Quad_PID* pid, float measured)
+float PID_Stand_Update()
 {
-  float output;
+  extern float Ang;
+	extern float Gyro_v;
+	float temp[6] = {0};
+	float output;
 	
-  pid->current = measured;
-  pid->merror = pid->target - measured;
+  PID_Stand.current = Ang;
+  PID_Stand.merror = PID_Stand.target - Ang;
+	
+	if( PID_Stand.merror > 0.3 || PID_Stand.merror < -0.3)	//µ÷½ÚËÀÇø
+	{
+		PID_Stand.deriv = -Gyro_v;
 
-  pid->Integrator += pid->merror * 0.005;
-  if (pid->Integrator > pid->iLimit)
-  {
-    pid->Integrator = pid->iLimit;
-  }
-  else if (pid->Integrator < -pid->iLimit)
-  {
-    pid->Integrator = -pid->iLimit;
-  }
+		PID_Stand.outP = PID_Stand.Kp * PID_Stand.merror;
+		PID_Stand.outD = PID_Stand.Kd * PID_Stand.deriv;
+		
+		PID_Stand.PID_out = output = 	PID_Stand.outP +
+															PID_Stand.outD;
+	}
 
-  pid->deriv = Gyro_v;
-
-  pid->outP = pid->Kp * pid->merror;
-  pid->outI = pid->Ki * pid->Integrator;
-  pid->outD = pid->Kd * pid->deriv;
-  pid->PID_out = output = 	pid->outP +
-														pid->outI +
-														pid->outD;
-
+	temp[0] = PID_Stand.target;
+	temp[1] = Ang;
+	temp[2] = PID_Stand.PID_out/10.0;
+	UART_DMA_Array_Width_Six(temp);
+	
   return output;
 }
 

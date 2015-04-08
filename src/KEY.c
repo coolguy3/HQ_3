@@ -15,6 +15,7 @@ void Key_Init(void)
 	GPIO_QuickInit(HW_GPIOD, 14, kGPIO_Mode_IPU);
 	//·äÃùÆ÷		ÍÆÍìÊä³ö
 	GPIO_QuickInit(HW_GPIOB, 22, kGPIO_Mode_OPP);
+	GPIO_SetBit(HW_GPIOB, 22);			//¹Ø±Õ·äÃùÆ÷
 }
 
 uint8_t Key_Scan(void)

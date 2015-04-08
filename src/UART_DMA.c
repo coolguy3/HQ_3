@@ -96,7 +96,6 @@ uint32_t UART_SendWithDMA(uint32_t dmaChl, const uint8_t *buf, uint32_t size)
 }
 
 
-
 /*
 *			功能：用串口DMA发送Float型数据(1~6个)到上位机，显示实时曲线
 *
@@ -115,7 +114,7 @@ void UART_DMA_Array_Width_Six(float * Array_Width_Six)
 			temp[k] = * ( (uint8_t *)(Array_Width_Six+i) + j );
 		}
 	}
-	while(DMA_IsMajorLoopComplete(DMA_SEND_CH));
+	while(DMA_IsMajorLoopComplete(DMA_SEND_CH)){;}
   UART_SendWithDMA(DMA_SEND_CH, (const uint8_t*)temp, sizeof(temp));		
 	
 }

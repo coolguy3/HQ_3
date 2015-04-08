@@ -3,12 +3,13 @@
 #include "uart.h"
 #include "PID.h"
 #include "UART_DMA.h"
+#include "ftm.h"
 
 //#define ARM_MATH_CM4
 //#include "arm_math.h"
 #include "math.h"
 
-int32_t Filter_Buf[10] = {0};			//滑动平均滤波缓存数组
+int32_t Gyro_Filter[10] = {0};			//滑动平均滤波缓存数组
 int16_t Gx_Offset=0,Gy_Offset=0,Gz_Offset=0;		//陀螺仪的零偏
 int16_t Gyro_X = 0;
 int16_t Gyro_Y = 0;
@@ -30,7 +31,7 @@ float Ang_Acc = 0.0;			//根据加速度算出的角度
 float Ang_Gyro = 0.0;			//根据陀螺仪算出的角度
 float Ang = 0.0;					//互补滤波后的角度
 float Gyro_v = 0.0;				//陀螺仪Y轴角速度
-struct Quad_PID PID_Stand;
+
 
 /*	
 	Q:过程噪声，Q增大，动态响应变快，收敛稳定性变坏
@@ -251,15 +252,11 @@ void L3G4200D_InitGyro_Offset(void)
 void IMU_Init(void)
 {
 	IIC_Init();
-	DelayMs(100);
+	DelayMs(10);
 	while( Init_MMA8452() )		{	DelayMs(10); }	//初始化MMA8452
 	while( Init_L3G4200D() )	{	DelayMs(10); }	//初始化L3G4200D
-	DelayMs(100);
+	DelayMs(10);
 	L3G4200D_InitGyro_Offset();
-	pidSetTarget(&PID_Stand,40.0);	//设置车直立的倾角
-	pidSetKp(&PID_Stand, 0.0);			
-	pidSetKi(&PID_Stand, 0.0);
-	pidSetKd(&PID_Stand, 0.0);
 }
 
 /****************陀螺仪传感器值的滑动平均滤波、加速度计传感器值的卡尔曼滤波*******************/
@@ -270,9 +267,9 @@ void IMU_Filter(int16_t * GY, int16_t * AX, int16_t * AZ)
 	float sum=0;
 	
 	//滑动平均滤波
-	Filter_Buf[num] = * GY;
+	Gyro_Filter[num] = * GY;
 	for(i=0;i<10;i++)
-		 sum += Filter_Buf[i];
+		 sum += Gyro_Filter[i];
 	Gyro_Y_Filtered = ( sum / 10.0 ) - Gy_Offset;
 	num = (num + 1) % 10;
 	
@@ -305,10 +302,10 @@ void IMU_Update(void)
 	Ang_Acc = atan2(Acc_Z_Filtered,Acc_X_Filtered) * ANG_TO_RAD;    //弧度转成角度 求z/x的反正切，本来应右移四位根据不同量程乘上转换系数,这里刚好分母分子约去
 	Gyro_v = Gyro_Y_Filtered * 0.07;	//	70mdps/digit	算得角速度，直立PID用到
 	Ang = 0.98 *  (Ang + Gyro_v * 0.005) 	+ 0.02 * Ang_Acc; // 采集周期5ms	 	互补滤波
-//	PID_Stand_Update(&PID_Stand, Ang);
 	
-	temp[0] = Ang - 0.02 * Ang_Acc;	
-	temp[1] = Ang;   
-	UART_DMA_Array_Width_Six(temp);
+	
+//	temp[0] = Ang - 0.02 * Ang_Acc;		//陀螺仪积分
+//	temp[1] = Ang;   									//互补的角度
+//	UART_DMA_Array_Width_Six(temp);
 	
 }

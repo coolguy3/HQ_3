@@ -12,26 +12,46 @@
 #include "PID.h"
 #include "KEY.h"
 #include "UART_DMA.h"
+#include "CTRL.h"
 
-
-
+#define SPEED_CTRL_PEROID		75	//ms
+extern struct Quad_PID PID_Stand;
 /**************1ms定时中断*****************/
 static void PIT0_ISR(void)
 {
-		static uint8_t IMU_5ms = 0;		//5ms标志位
-		IMU_5ms++;
-		if(IMU_5ms == 5)
+		static uint8_t Count_Flag = 0;		//5ms标志位	
+		static uint8_t Speed_Flag = 0;
+	
+		Count_Flag++;
+	
+		if(Count_Flag == 0)
 		{
-			IMU_5ms = 0;
-			IMU_Update();   //读姿态传感器、滤波、算出角度、PID_Stand
+			Speed_Flag++;
+			if(Speed_Flag == 4)
+			{
+				Speed_Flag = 0;
+				Speed_Measure();	//25ms执行一次
+			}		
+		}
+		if(Count_Flag == 1)
+		{
+
+		}
+		if(Count_Flag == 2)		//直立	5ms计算		5ms控制
+		{
+			IMU_Update();   //读姿态传感器、滤波、算出角度
+			PID_Stand_Update();
+			Motor_Set();
+		}
+		if(Count_Flag == 3)		//速度	75ms计算	5ms控制
+		{
+			
+		}
+		if(Count_Flag == 4)		//方向	10ms计算	5ms控制
+		{
+			Count_Flag = 0;
 		}
 
-//	int value; /* 记录正交脉冲个数 */
-//    uint8_t dir; /* 记录编码器旋转方向1 */
-//    FTM_QD_GetData(HW_FTM2, &value, &dir);
-//    printf("value:%6x dir:%d  \r", value, dir);
-//    FTM_QD_ClearCount(HW_FTM2); /* 如测量频率则需要定时清除Count值 ，定时获取数据 */
-	
 }
 
 /**************0.2ms定时中断***************/
@@ -63,11 +83,11 @@ static void PIT1_ISR(void)
 	
 }
 
-
 int main(void)
 {
 	enum Key { Key_Up,Key_Down,Key_Left,Key_Right,Key_Enter,No_Key	} Key;
 	int16_t Duty1 = 5000 , Duty2 = 5000;
+//	float Kp,Kd;
 	
 	DelayInit();
 	
@@ -89,26 +109,37 @@ int main(void)
 	UART_ITDMAConfig(HW_UART2, kUART_DMA_Tx, true);
 	UART_DMASendInit(HW_UART2, DMA_SEND_CH, NULL);
 		
-	/***********初始化模拟IIC: SDA--C11 SCL--C10 、陀螺仪、加速度计******/
+	/**********蜂鸣器第一声示意要开始初始化IMU并计算陀螺仪零偏、车模需保持静止！！！**********/
+	GPIO_ToggleBit(HW_GPIOB, 22);
+	DelayMs(200);
+	GPIO_ToggleBit(HW_GPIOB, 22);		
+		
+	/***********初始化模拟IIC: SDA--C11 SCL--C10 、算零偏、设置直立角度和PID参数********/
 	IMU_Init();		//初始化不通过会陷入死循环	
+	pidSetTarget(&PID_Stand,43.0);	//设置车直立的倾角
+	pidSetKp(&PID_Stand, 73);			
+	pidSetKd(&PID_Stand, 0.6);
 	
-	/***********初始化 SI--C4 CLK--C5 、ADC1_SE4B_PC8、8bits精度**********/
+	/***********初始化 SI--C4 CLK--C5 、ADC1_SE4B_PC8、8bits精度************************/
 	CCD_Init(); 
 
 	/***********初始化PIT定时模块***********************/
-	PIT_QuickInit(HW_PIT_CH0, 1*1000);				 //定时1ms
-	PIT_CallbackInstall(HW_PIT_CH0, PIT0_ISR); //PIT0_ISR是自定义中断函数名
+	PIT_QuickInit(HW_PIT_CH0, 1*1000);					//定时1ms
+	PIT_CallbackInstall(HW_PIT_CH0, PIT0_ISR);	//PIT0_ISR是自定义中断函数名
 	PIT_ITDMAConfig(HW_PIT_CH0, kPIT_IT_TOF,ENABLE);
 
-	PIT_QuickInit(HW_PIT_CH1, 0.2*1000);				 	 //定时0.2ms
+	PIT_QuickInit(HW_PIT_CH1, 0.2*1000);				//定时0.2ms
 	PIT_CallbackInstall(HW_PIT_CH1, PIT1_ISR); 
 	PIT_ITDMAConfig(HW_PIT_CH1, kPIT_IT_TOF,ENABLE);
 
+	/**********蜂鸣器第二声示意初始化完成****************/
+	GPIO_ToggleBit(HW_GPIOB, 22);
+	DelayMs(100);
+	GPIO_ToggleBit(HW_GPIOB, 22);		
+
 	while(1)
 	{
-	//		DelayMs(500);
-	//		GPIO_ToggleBit(HW_GPIOB, 22);		//蜂鸣器反转
-		
+				
 		Key = (enum Key)Key_Scan();
 		switch(Key)
 		{
@@ -117,10 +148,10 @@ int main(void)
 												FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH3 , Duty1);		break;	// 0-10000 对应占空比 0-100%
 			case Key_Down		: Duty1 -= 100;
 												if(Duty1 < 0)			Duty1 = 0;			
-												FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH3 , Duty1);		break;
+												FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH3 , Duty1);		break;	//右轮
 			case Key_Left		: Duty2 += 100;	
 												if(Duty2 > 10000)	Duty2 = 10000;
-												FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH4 , Duty2);		break;
+												FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH4 , Duty2);		break;	//左轮
 			case Key_Right	: Duty2 -= 100;	
 												if(Duty2 < 0)			Duty2 = 0;			
 												FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH4 , Duty2);		break;
@@ -128,7 +159,7 @@ int main(void)
 			default :  break;	//DelayMs(10);	
 		}
 		
-		CCD_Report();
+	//	CCD_Report();
 
 	}	//while end
 	

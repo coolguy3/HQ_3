@@ -25,7 +25,7 @@ struct Quad_PID
 
 void pidInit(struct Quad_PID* pid, const float kp,
              const float ki, const float kd);
-float PID_Stand_Update(struct Quad_PID* pid, float measured);
+float PID_Stand_Update(void);
 void pidSetIntegralLimit(struct Quad_PID* pid, float limit);
 void pidSetError(struct Quad_PID* pid, float err);
 void pidReset(struct Quad_PID* pid);
