@@ -13,9 +13,11 @@
 #include "KEY.h"
 #include "UART_DMA.h"
 #include "CTRL.h"
+#include "OLED.h"
 
 #define SPEED_CTRL_PEROID		75	//ms
 extern struct Quad_PID PID_Stand;
+uint8_t Motor_Set_Flag = 0;			//按键Enter键控制，是否开启电机控制
 /**************1ms定时中断*****************/
 static void PIT0_ISR(void)
 {
@@ -41,6 +43,7 @@ static void PIT0_ISR(void)
 		{
 			IMU_Update();   //读姿态传感器、滤波、算出角度
 			PID_Stand_Update();
+			if(Motor_Set_Flag)
 			Motor_Set();
 		}
 		if(Count_Flag == 3)		//速度	75ms计算	5ms控制
@@ -87,7 +90,11 @@ int main(void)
 {
 	enum Key { Key_Up,Key_Down,Key_Left,Key_Right,Key_Enter,No_Key	} Key;
 	int16_t Duty1 = 5000 , Duty2 = 5000;
-//	float Kp,Kd;
+
+	static struct Parameter
+	{
+		float Stand_Kp,Stand_Kd;
+	}Flash_Parameter;
 	
 	DelayInit();
 	
@@ -108,20 +115,23 @@ int main(void)
 //	UART_SetTxFIFOWatermark(HW_UART2, UART_GetTxFIFOSize(HW_UART2));
 	UART_ITDMAConfig(HW_UART2, kUART_DMA_Tx, true);
 	UART_DMASendInit(HW_UART2, DMA_SEND_CH, NULL);
-		
+					
+	/***********初始化 SI--C4 CLK--C5 、ADC1_SE4B_PC8、8bits精度************************/
+	CCD_Init();
+	
+	/***********初始化OLED和片内Flash**********************/
+	OLED_Init();
+	MKP512FlashInit();
+	Flash_Parameter = * ( (struct Parameter *)TEST_ADDR_BEIGN );
+	
 	/**********蜂鸣器第一声示意要开始初始化IMU并计算陀螺仪零偏、车模需保持静止！！！**********/
 	GPIO_ToggleBit(HW_GPIOB, 22);
 	DelayMs(200);
 	GPIO_ToggleBit(HW_GPIOB, 22);		
-		
+
 	/***********初始化模拟IIC: SDA--C11 SCL--C10 、算零偏、设置直立角度和PID参数********/
 	IMU_Init();		//初始化不通过会陷入死循环	
 	pidSetTarget(&PID_Stand,43.0);	//设置车直立的倾角
-	pidSetKp(&PID_Stand, 73);			
-	pidSetKd(&PID_Stand, 0.6);
-	
-	/***********初始化 SI--C4 CLK--C5 、ADC1_SE4B_PC8、8bits精度************************/
-	CCD_Init(); 
 
 	/***********初始化PIT定时模块***********************/
 	PIT_QuickInit(HW_PIT_CH0, 1*1000);					//定时1ms
@@ -140,26 +150,63 @@ int main(void)
 	while(1)
 	{
 				
-		Key = (enum Key)Key_Scan();
+//		Key = (enum Key)Key_Scan();
+//		switch(Key)
+//		{
+//			case Key_Up			:	Duty1 += 100;				// 0-10000 对应占空比 0-100%
+//												if(Duty1 > 10000)	Duty1 = 10000;
+//												FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH3 , Duty1);		
+//												OLED_Show_Data(0,0,Duty1);
+//												break;	
+//			case Key_Down		: Duty1 -= 100;
+//												if(Duty1 < 0)			Duty1 = 0;			
+//												FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH3 , Duty1);		
+//												OLED_Show_Data(0,0,Duty1);
+//												break;	//右轮
+//			case Key_Left		: Duty2 += 100;	
+//												if(Duty2 > 10000)	Duty2 = 10000;
+//												FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH4 , Duty2);		
+//												OLED_Show_Data(0,1,Duty2);
+//												break;	//左轮
+//			case Key_Right	: Duty2 -= 100;	
+//												if(Duty2 < 0)			Duty2 = 0;			
+//												FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH4 , Duty2);		
+//												OLED_Show_Data(0,1,Duty2);
+//												break;
+//			case Key_Enter	: 		 break;
+//			default :  break;	//DelayMs(10);	
+//		}
+
+		Key = (enum Key)Key_Scan(!Boma_1);	//拨码开关1---0,不支持连续按;1,支持连续按
 		switch(Key)
 		{
-			case Key_Up			:	Duty1 += 100;	
-												if(Duty1 > 10000)	Duty1 = 10000;
-												FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH3 , Duty1);		break;	// 0-10000 对应占空比 0-100%
-			case Key_Down		: Duty1 -= 100;
-												if(Duty1 < 0)			Duty1 = 0;			
-												FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH3 , Duty1);		break;	//右轮
-			case Key_Left		: Duty2 += 100;	
-												if(Duty2 > 10000)	Duty2 = 10000;
-												FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH4 , Duty2);		break;	//左轮
-			case Key_Right	: Duty2 -= 100;	
-												if(Duty2 < 0)			Duty2 = 0;			
-												FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH4 , Duty2);		break;
-			case Key_Enter	: 		 break;
+			case Key_Up			:	Flash_Parameter.Stand_Kp += 0.1;
+												OLED_P6x8Str(0,0,"Kp:");
+												OLED_Show_Float(3,0,Flash_Parameter.Stand_Kp);
+												break;	
+			case Key_Down		: Flash_Parameter.Stand_Kp -= 0.1;
+												OLED_P6x8Str(0,0,"Kp:");
+												OLED_Show_Float(3,0,Flash_Parameter.Stand_Kp);
+												break;	//右轮
+			case Key_Left		: Flash_Parameter.Stand_Kd += 0.1;
+												OLED_P6x8Str(0,1,"Kd:");
+												OLED_Show_Float(3,1,Flash_Parameter.Stand_Kd);
+												break;	//左轮
+			case Key_Right	: Flash_Parameter.Stand_Kd -= 0.1;
+												OLED_P6x8Str(0,1,"Kd:");
+												OLED_Show_Float(3,1,Flash_Parameter.Stand_Kd);
+												break;
+			case Key_Enter	:	EraseSector(TEST_ADDR_BEIGN);
+												ProgramPage(TEST_ADDR_BEIGN, sizeof(Flash_Parameter), (void*)&Flash_Parameter);
+												pidSetKp(&PID_Stand, Flash_Parameter.Stand_Kp);			
+												pidSetKd(&PID_Stand, Flash_Parameter.Stand_Kd);		//0.6
+												Motor_Set_Flag = 1;
+												break;
 			default :  break;	//DelayMs(10);	
 		}
+
 		
-	//	CCD_Report();
+		CCD_Report();
 
 	}	//while end
 	

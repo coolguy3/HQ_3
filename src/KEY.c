@@ -18,9 +18,10 @@ void Key_Init(void)
 	GPIO_SetBit(HW_GPIOB, 22);			//关闭蜂鸣器
 }
 
-uint8_t Key_Scan(void)
+uint8_t Key_Scan(uint8_t mode)
 {	 
 	static uint8_t key_up=1;//按键按松开标志
+	if(mode)key_up=1;  //支持连按		
 	if( key_up && (PEin(8)==0||PEin(12)==0||PEin(11)==0||PEin(10)==0||PEin(9)==0) )
 	{
 		DelayMs(10);//去抖动 

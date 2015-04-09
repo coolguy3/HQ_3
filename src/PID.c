@@ -41,6 +41,7 @@ float PID_Stand_Update()
 	temp[0] = PID_Stand.target;
 	temp[1] = Ang;
 	temp[2] = PID_Stand.PID_out/10.0;
+	temp[3] = -Gyro_v;
 	UART_DMA_Array_Width_Six(temp);
 	
   return output;
