@@ -24,36 +24,35 @@ static void PIT0_ISR(void)
 		static uint8_t Count_Flag = 0;		//5ms标志位	
 		static uint8_t Speed_Flag = 0;
 	
-		Count_Flag++;
-	
-		if(Count_Flag == 0)
+		if(Count_Flag == 1)
 		{
-			Speed_Flag++;
-			if(Speed_Flag == 4)
+			if(Speed_Flag == 5)
 			{
 				Speed_Flag = 0;
 				Speed_Measure();	//25ms执行一次
 			}		
+			Speed_Flag++;
 		}
-		if(Count_Flag == 1)
+		if(Count_Flag == 2)
 		{
 
 		}
-		if(Count_Flag == 2)		//直立	5ms计算		5ms控制
+		if(Count_Flag == 3)		//直立	5ms计算		5ms控制
 		{
 			IMU_Update();   //读姿态传感器、滤波、算出角度
 			PID_Stand_Update();
 			if(Motor_Set_Flag)
 			Motor_Set();
 		}
-		if(Count_Flag == 3)		//速度	75ms计算	5ms控制
+		if(Count_Flag == 4)		//速度	75ms计算	5ms控制
 		{
 			
 		}
-		if(Count_Flag == 4)		//方向	10ms计算	5ms控制
+		if(Count_Flag == 5)		//方向	10ms计算	5ms控制
 		{
 			Count_Flag = 0;
 		}
+		Count_Flag++;
 
 }
 

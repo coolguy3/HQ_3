@@ -27,8 +27,8 @@ float PID_Stand_Update()
   PID_Stand.current = Ang;
   PID_Stand.merror = PID_Stand.target - Ang;
 	
-	if( PID_Stand.merror > 0.3 || PID_Stand.merror < -0.3)	//调节死区
-	{
+//	if( PID_Stand.merror > 0.3 || PID_Stand.merror < -0.3)	//调节死区
+//	{
 		PID_Stand.deriv = -Gyro_v;
 
 		PID_Stand.outP = PID_Stand.Kp * PID_Stand.merror;
@@ -36,7 +36,7 @@ float PID_Stand_Update()
 		
 		PID_Stand.PID_out = output = 	PID_Stand.outP +
 															PID_Stand.outD;
-	}
+//	}
 
 	temp[0] = PID_Stand.target;
 	temp[1] = Ang;
