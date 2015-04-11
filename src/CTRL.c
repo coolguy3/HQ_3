@@ -34,7 +34,7 @@ void Speed_Measure()
 //	uint8_t  i = 0,Cnt_Left = 0,Cnt_Right = 0;
 //	static uint8_t	num = 0 ;
 	
-	int32_t temp[2] = {0};
+	int32_t temp[3] = {0};
 	
 	FTM_QD_GetData(HW_FTM1, &Speed_Left, &Dir_Left);
 	FTM_QD_GetData(HW_FTM2, &Speed_Right, &Dir_Right);
@@ -82,6 +82,7 @@ void Speed_Measure()
 
 //	temp[0] = Speed_Left;
 //	temp[1] = Speed_Right;
+//	temp[2] = Speed_Car;
 //	UART_DMA_Array_Report(sizeof(temp) ,temp);
 	
 	FTM_QD_ClearCount(HW_FTM1); 	//如测量频率则需要定时清除Count值 ，定时获取数据 
@@ -137,12 +138,12 @@ void Motor_Set()
 		Duty_Right = 5000;
 	}
 	
-//	//车子角度失常停电机
-//	if( Ang > 75 || Ang < 25)
-//	{
-//		Duty_Left = 5000;
-//		Duty_Right = 5000;
-//	}
+	//车子角度失常停电机
+	if( Ang > 75 || Ang < 25)
+	{
+		Duty_Left = 5000;
+		Duty_Right = 5000;
+	}
 	
 	FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH4 , Duty_Left);
 	FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH3 , Duty_Right);

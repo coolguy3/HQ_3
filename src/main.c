@@ -42,8 +42,8 @@ static void PIT0_ISR(void)
 		{
 			IMU_Update();   //读姿态传感器、滤波、算出角度
 			PID_Stand_Update();
-//			if(Motor_Set_Flag)
-//			Motor_Set();
+			if(Motor_Set_Flag)
+			Motor_Set();
 		}
 		if(Count_Flag == 4)		//速度	75ms计算	5ms控制
 		{
@@ -102,6 +102,8 @@ int main(void)
 {
 	enum Key { Key_Up,Key_Down,Key_Left,Key_Right,Key_Enter,No_Key	} Key;
 	int16_t Duty1 = 5000 , Duty2 = 5000;
+	uint8_t OLED_Show = 0;
+	float * OLED_Adjust = 0;
 
 	static struct Parameter
 	{
@@ -146,7 +148,6 @@ int main(void)
 	IMU_Init();		//初始化不通过会陷入死循环	
 	pidSetTarget(&PID_Stand,44);	//设置车直立的倾角
 	pidSetTarget(&PID_Speed,0);
-	Flash_Parameter.Speed_Kp = 200;
 	
 	/***********初始化PIT定时模块***********************/
 	PIT_QuickInit(HW_PIT_CH0, 1*1000);					//定时1ms
@@ -222,30 +223,55 @@ int main(void)
 		Key = (enum Key)Key_Scan(!Boma_1);	//拨码开关1---0,不支持连续按;1,支持连续按
 		switch(Key)
 		{
-			case Key_Up			:	Flash_Parameter.Stand_Kp += 0.1;
-												OLED_P6x8Str(0,0,"Kp:");
-												OLED_Show_Float(3,0,Flash_Parameter.Stand_Kp);
-												break;	
-			case Key_Down		: Flash_Parameter.Stand_Kp -= 0.1;
-												OLED_P6x8Str(0,0,"Kp:");
-												OLED_Show_Float(3,0,Flash_Parameter.Stand_Kp);
-												break;	//右轮
-			case Key_Left		: Flash_Parameter.Stand_Kd += 0.1;
-												OLED_P6x8Str(0,1,"Kd:");
-												OLED_Show_Float(3,1,Flash_Parameter.Stand_Kd);
-												break;	//左轮
-			case Key_Right	: Flash_Parameter.Stand_Kd -= 0.1;
-												OLED_P6x8Str(0,1,"Kd:");
-												OLED_Show_Float(3,1,Flash_Parameter.Stand_Kd);
-												break;
+			case Key_Up			:	*OLED_Adjust += 0.1;			break;	
+			case Key_Down		: *OLED_Adjust -= 0.1;			break;	
+			case Key_Left		: OLED_Show--;	OLED_Fill(0x00);	if(OLED_Show < 0)OLED_Show = 0;			break;	
+			case Key_Right	: OLED_Show++;	OLED_Fill(0x00);	if(OLED_Show > 6)OLED_Show = 0;			break;
 			case Key_Enter	:	EraseSector(TEST_ADDR_BEIGN);
 												ProgramPage(TEST_ADDR_BEIGN, sizeof(Flash_Parameter), (void*)&Flash_Parameter);
 												pidSetKp(&PID_Stand, Flash_Parameter.Stand_Kp);			
 												pidSetKd(&PID_Stand, Flash_Parameter.Stand_Kd);		//0.6
 												pidSetKp(&PID_Speed, Flash_Parameter.Speed_Kp);
+			                  pidSetKi(&PID_Speed, Flash_Parameter.Speed_Ki);
+												pidSetKd(&PID_Speed, Flash_Parameter.Speed_Kd);
 												Motor_Set_Flag = 1;
 												break;
-			default :  break;	//DelayMs(10);	
+			default : DelayMs(20);	 break;	
+		}
+		
+		switch(OLED_Show)
+		{
+			case 0	:		OLED_P6x8Str(0,0,"Stand_PID_Parameter:");
+									OLED_P6x8Str(0*6,1,"Kp: ");	OLED_Show_Float(4,1,Flash_Parameter.Stand_Kp);
+									OLED_P6x8Str(0*6,2,"Ki: ");	OLED_Show_Float(4,2,0);
+									OLED_P6x8Str(0*6,3,"Kd: ");	OLED_Show_Float(4,3,Flash_Parameter.Stand_Kd);
+									break;	
+			case 1	:		OLED_P6x8Str(0,0,"Stand_PID_Parameter:");
+									OLED_P6x8Str(0*6,1,"Kp: ");	OLED_Show_Float(4,1,Flash_Parameter.Stand_Kp);
+									OLED_Adjust = &Flash_Parameter.Stand_Kp;
+									break;
+			case 2	:		OLED_P6x8Str(0,0,"Stand_PID_Parameter:");
+									OLED_P6x8Str(0*6,3,"Kd: ");	OLED_Show_Float(4,3,Flash_Parameter.Stand_Kd);
+									OLED_Adjust = &Flash_Parameter.Stand_Kd;
+									break;
+			
+			case 3	:		OLED_P6x8Str(0,0,"Speed_PID_Parameter:");
+									OLED_P6x8Str(0*6,1,"Kp: ");	OLED_Show_Float(4,1,Flash_Parameter.Speed_Kp);
+									OLED_P6x8Str(0*6,2,"Ki: ");	OLED_Show_Float(4,2,Flash_Parameter.Speed_Ki);
+									OLED_P6x8Str(0*6,3,"Kd: ");	OLED_Show_Float(4,3,Flash_Parameter.Speed_Kd);
+									break;
+			case 4	:		OLED_P6x8Str(0,0,"Speed_PID_Parameter:");
+									OLED_P6x8Str(0*6,1,"Kp: ");	OLED_Show_Float(4,1,Flash_Parameter.Speed_Kp);
+									OLED_Adjust = &Flash_Parameter.Speed_Kp;
+									break;
+			case 5	:		OLED_P6x8Str(0,0,"Speed_PID_Parameter:");
+									OLED_P6x8Str(0*6,2,"Ki: ");	OLED_Show_Float(4,2,Flash_Parameter.Speed_Ki);
+									OLED_Adjust = &Flash_Parameter.Speed_Ki;
+									break;						
+			case 6	:		OLED_P6x8Str(0,0,"Speed_PID_Parameter:");
+									OLED_P6x8Str(0*6,3,"Kd: ");	OLED_Show_Float(4,3,Flash_Parameter.Speed_Kd);
+									OLED_Adjust = &Flash_Parameter.Speed_Kd;
+									break;
 		}
 
 		CCD_Report();

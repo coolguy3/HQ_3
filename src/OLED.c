@@ -192,7 +192,7 @@ void OLED_CLS(void)
 void OLED_Init(void)
 {
 	OLED_IIC_Init();
-	OLED_Delay(2000);
+	OLED_Delay(33333);
 	OLED_WrCmd(0xae);//--turn off oled panel
 	OLED_WrCmd(0x00);//---set low column address
 	OLED_WrCmd(0x10);//---set high column address
