@@ -97,25 +97,40 @@ uint32_t UART_SendWithDMA(uint32_t dmaChl, const uint8_t *buf, uint32_t size)
 
 
 /*
-*			功能：用串口DMA发送Float型数据(1~6个)到上位机，显示实时曲线
+*			功能：用串口DMA发送任意型数据(1~8个)到上位机，显示实时曲线(上位机选择波形数目要看传输的数组长度)
 *
-*			参数：Float型数组指针
+*			参数：数组字节数(用sizeof)、数组指针
 */
-void UART_DMA_Array_Width_Six(float * Array_Width_Six)
+void UART_DMA_Array_Report(uint8_t cnt , void * Array_Width_Six)
 {
-	uint8_t temp[28] = {0} , i = 0 , j = 0 , k = 2;
+	uint8_t temp[99] = {0}, i = 0 ;
+	
 	temp[0] = 0x03;		temp[1] = 0xfc;			//帧头
-	temp[26] = 0xfc;	temp[27] = 0x03;  	//帧尾
-
-	for( i = 0 ; i < 6 ; i++ )
+	for( i = 0 ; i < cnt ; i++ )
 	{
-		for( j = 0 ; j < 4 ; j++,k++ )
-		{
-			temp[k] = * ( (uint8_t *)(Array_Width_Six+i) + j );
-		}
+		temp[i + 2] = * ( (uint8_t *)Array_Width_Six + i);
 	}
+	temp[cnt + 2] = 0xfc;	temp[cnt + 3] = 0x03;  	//帧尾
+	
 	while(DMA_IsMajorLoopComplete(DMA_SEND_CH)){;}
-  UART_SendWithDMA(DMA_SEND_CH, (const uint8_t*)temp, sizeof(temp));		
+  UART_SendWithDMA(DMA_SEND_CH, (const uint8_t*)temp, cnt + 4);		
 	
 }
 
+//测试用UART_DMA_CCD_Report发送一直有乱码出现
+void UART_DMA_CCD_Report(void)	//100ms
+{
+//	extern uint8_t Pixel[];
+	uint8_t temp[132] = {0}, i = 0 ;
+	
+	temp[0] = 0x02;		temp[1] = 0xfd;			//帧头
+//	for( i = 0 ; i < 128 ; i++ )
+//	{
+//		temp[i + 2] = * ( (uint8_t *)Pixel + i);
+//	}
+	temp[128 + 2] = 0xfd;	temp[128 + 3] = 0x02;  	//帧尾
+	
+	while(DMA_IsMajorLoopComplete(DMA_SEND_CH)){;}
+  UART_SendWithDMA(DMA_SEND_CH, (const uint8_t*)temp, 128 + 4);
+
+}

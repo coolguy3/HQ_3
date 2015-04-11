@@ -1,12 +1,13 @@
 #include "PID.h"
 #include "UART_DMA.h"
 
-struct Quad_PID PID_Stand;
+struct Quad_PID PID_Stand , PID_Speed;
 
 void pidInit(struct Quad_PID* pid, float kp,float ki, float kd)
 {
-  pid->merror = 0;
-  pid->last_error = 0;
+  pid->error = 0;
+  pid->d_error = 0;
+	pid->dd_error = 0;
   pid->Integrator = 0;
   pid->deriv = 0;
   pid->target = 0;
@@ -22,34 +23,63 @@ float PID_Stand_Update()
   extern float Ang;
 	extern float Gyro_v;
 	float temp[6] = {0};
-	float output;
+	float output = 0;
 	
   PID_Stand.current = Ang;
-  PID_Stand.merror = PID_Stand.target - Ang;
+  PID_Stand.error = PID_Stand.target - Ang;
 	
-//	if( PID_Stand.merror > 0.3 || PID_Stand.merror < -0.3)	//调节死区
-//	{
-		PID_Stand.deriv = -Gyro_v;
+	PID_Stand.deriv = -Gyro_v;
 
-		PID_Stand.outP = PID_Stand.Kp * PID_Stand.merror;
-		PID_Stand.outD = PID_Stand.Kd * PID_Stand.deriv;
+	PID_Stand.outP = PID_Stand.Kp * PID_Stand.error;
+	PID_Stand.outD = PID_Stand.Kd * PID_Stand.deriv;
+	
+	PID_Stand.PID_out = output = 	PID_Stand.outP +
+														PID_Stand.outD;
+
+
+//	temp[0] = PID_Stand.target;
+//	temp[1] = Ang;
+//	temp[2] = PID_Stand.PID_out/10.0;
+//	temp[3] = -Gyro_v;
+//	UART_DMA_Array_Report(sizeof(temp),temp);
+	
+  return output;
+}
+
+float PID_Speed_Update()
+{
+  extern float Speed_Car;
+	float	Error,D_Error,DD_Error;
+	static float output = 0;
+	
+	float temp[6] = {0};
+	
+	Error = PID_Speed.target - Speed_Car;
+	D_Error = Error - PID_Speed.d_error;
+	DD_Error = D_Error - PID_Speed.dd_error;
+	
+	PID_Speed.d_error = Error;
+	PID_Speed.dd_error = D_Error;
+	
+	if( Error > 0 || Error < 0)
+	{
+		PID_Speed.outP = PID_Speed.Kp * D_Error;
+		PID_Speed.outI = PID_Speed.Ki * Error;
+		PID_Speed.outD = PID_Speed.Kd * DD_Error;
 		
-		PID_Stand.PID_out = output = 	PID_Stand.outP +
-															PID_Stand.outD;
-//	}
-
-	temp[0] = PID_Stand.target;
-	temp[1] = Ang;
-	temp[2] = PID_Stand.PID_out/10.0;
-	temp[3] = -Gyro_v;
-	UART_DMA_Array_Width_Six(temp);
+		PID_Speed.PID_Avg_out = output = 	( PID_Speed.outP + PID_Speed.outI + PID_Speed.outD ) / 15.0;	//增量平均输出
+	}
+	else
+		PID_Speed.PID_Avg_out = output = 	0;
+	
+//	UART_DMA_Array_Report(sizeof(temp),temp);
 	
   return output;
 }
 
 void pidSetError(struct Quad_PID* pid, float err)
 {
-  pid->merror = err;
+  pid->error = err;
 }
 
 void pidSetIntegralLimit(struct Quad_PID* pid, float limit)
@@ -59,8 +89,9 @@ void pidSetIntegralLimit(struct Quad_PID* pid, float limit)
 
 void pidReset(struct Quad_PID* pid)
 {
-  pid->merror = 0;
-  pid->last_error = 0;
+  pid->error = 0;
+  pid->d_error = 0;
+	pid->dd_error = 0;
   pid->Integrator = 0;
   pid->deriv = 0;
 }

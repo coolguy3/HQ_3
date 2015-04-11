@@ -5,8 +5,9 @@ struct Quad_PID
 {
 	float target;  		// 目标值
 	float current; 		// 当前值
-	float merror;			//当前偏差
-	float last_error;	//上次偏差
+	float error;			//当前偏差
+	float d_error;		//上次偏差
+	float dd_error;		//上上次偏差
 	float Integrator;	//当前积分值(未乘上Ki)
 	float deriv;			//当前微分值(未乘上Kd)
 	float iLimit;			//积分限制值
@@ -18,6 +19,7 @@ struct Quad_PID
   float outI;         //< integral output (debugging)
   float outD;         //< derivative output (debugging)
 	float PID_out;   		//当前PID的输出
+	float PID_Avg_out;
 		
 };
 
@@ -26,6 +28,7 @@ struct Quad_PID
 void pidInit(struct Quad_PID* pid, const float kp,
              const float ki, const float kd);
 float PID_Stand_Update(void);
+float PID_Speed_Update(void);
 void pidSetIntegralLimit(struct Quad_PID* pid, float limit);
 void pidSetError(struct Quad_PID* pid, float err);
 void pidReset(struct Quad_PID* pid);

@@ -15,42 +15,55 @@
 #include "CTRL.h"
 #include "OLED.h"
 
-#define SPEED_CTRL_PEROID		75	//ms
-extern struct Quad_PID PID_Stand;
+extern struct Quad_PID PID_Stand , PID_Speed;
 uint8_t Motor_Set_Flag = 0;			//按键Enter键控制，是否开启电机控制
 /**************1ms定时中断*****************/
 static void PIT0_ISR(void)
 {
 		static uint8_t Count_Flag = 0;		//5ms标志位	
 		static uint8_t Speed_Flag = 0;
+		static uint8_t CCD_Flag = 0;
 	
 		if(Count_Flag == 1)
 		{
-			if(Speed_Flag == 5)
-			{
-				Speed_Flag = 0;
-				Speed_Measure();	//25ms执行一次
-			}		
-			Speed_Flag++;
+			
 		}
 		if(Count_Flag == 2)
 		{
-
+			//测试用UART_DMA_CCD_Report发送一直有乱码出现
+//			if(CCD_Flag == 20)
+//			{
+//				CCD_Flag = 0;
+//				UART_DMA_CCD_Report();
+//			}
+//			CCD_Flag++;
 		}
 		if(Count_Flag == 3)		//直立	5ms计算		5ms控制
 		{
 			IMU_Update();   //读姿态传感器、滤波、算出角度
 			PID_Stand_Update();
-			if(Motor_Set_Flag)
-			Motor_Set();
+//			if(Motor_Set_Flag)
+//			Motor_Set();
 		}
 		if(Count_Flag == 4)		//速度	75ms计算	5ms控制
 		{
+			if(Speed_Flag == 7)
+			{
+				Speed_Flag = 0;
+				Speed_Measure();	
+				PID_Speed_Update();
+			}
+			if(Speed_Flag == 15)
+			{
+				Speed_Flag = 0;
+			}
+			Speed_Flag++;
 			
 		}
 		if(Count_Flag == 5)		//方向	10ms计算	5ms控制
 		{
 			Count_Flag = 0;
+			
 		}
 		Count_Flag++;
 
@@ -60,8 +73,8 @@ static void PIT0_ISR(void)
 static void PIT1_ISR(void)
 {
   extern uint8_t IntegrationTime;       //曝光时间  
-	extern uint8_t UART_Buffer_CCD[132];	//存放采集AD值
-	extern uint8_t TIME1flag_20ms;	//20ms标志位
+	extern uint8_t UART_Buffer_CCD[128];						//存放采集AD值
+	extern uint8_t TIME1flag_20ms;
   static uint8_t TimerCnt20ms = 0;
   uint8_t integration_piont = 0;
    
@@ -78,7 +91,7 @@ static void PIT1_ISR(void)
   if(TimerCnt20ms >= 100) 				//定时20ms   100 * 0.2 = 20ms
 	{
     TimerCnt20ms = 0;
-    TIME1flag_20ms = 1;
+		TIME1flag_20ms = 1;
 		ImageCapture(UART_Buffer_CCD + 2);					//CCD采样程序,函数里有参数需调整，按时序控制SI、CLK进行AD采集，结果存放在Pixel数组
 		CalculateIntegrationTime();		//根据采集输出AO(可表示光强)，反馈计算曝光时间
   }
@@ -93,6 +106,7 @@ int main(void)
 	static struct Parameter
 	{
 		float Stand_Kp,Stand_Kd;
+		float Speed_Kp,Speed_Ki,Speed_Kd;
 	}Flash_Parameter;
 	
 	DelayInit();
@@ -130,8 +144,10 @@ int main(void)
 
 	/***********初始化模拟IIC: SDA--C11 SCL--C10 、算零偏、设置直立角度和PID参数********/
 	IMU_Init();		//初始化不通过会陷入死循环	
-	pidSetTarget(&PID_Stand,43.0);	//设置车直立的倾角
-
+	pidSetTarget(&PID_Stand,44);	//设置车直立的倾角
+	pidSetTarget(&PID_Speed,0);
+	Flash_Parameter.Speed_Kp = 200;
+	
 	/***********初始化PIT定时模块***********************/
 	PIT_QuickInit(HW_PIT_CH0, 1*1000);					//定时1ms
 	PIT_CallbackInstall(HW_PIT_CH0, PIT0_ISR);	//PIT0_ISR是自定义中断函数名
@@ -176,6 +192,33 @@ int main(void)
 //			default :  break;	//DelayMs(10);	
 //		}
 
+//		Key = (enum Key)Key_Scan(!Boma_1);	//拨码开关1---0,不支持连续按;1,支持连续按
+//		switch(Key)
+//		{
+//			case Key_Up			:	Flash_Parameter.Stand_Kp += 0.1;
+//												OLED_P6x8Str(0,0,"Kp:");
+//												OLED_Show_Float(3,0,Flash_Parameter.Stand_Kp);
+//												break;	
+//			case Key_Down		: Flash_Parameter.Stand_Kp -= 0.1;
+//												OLED_P6x8Str(0,0,"Kp:");
+//												OLED_Show_Float(3,0,Flash_Parameter.Stand_Kp);
+//												break;	//右轮
+//			case Key_Left		: Flash_Parameter.Stand_Kd += 0.1;
+//												OLED_P6x8Str(0,1,"Kd:");
+//												OLED_Show_Float(3,1,Flash_Parameter.Stand_Kd);
+//												break;	//左轮
+//			case Key_Right	: Flash_Parameter.Stand_Kd -= 0.1;
+//												OLED_P6x8Str(0,1,"Kd:");
+//												OLED_Show_Float(3,1,Flash_Parameter.Stand_Kd);
+//												break;
+//			case Key_Enter	:	EraseSector(TEST_ADDR_BEIGN);
+//												ProgramPage(TEST_ADDR_BEIGN, sizeof(Flash_Parameter), (void*)&Flash_Parameter);
+//												pidSetKp(&PID_Stand, Flash_Parameter.Stand_Kp);			
+//												pidSetKd(&PID_Stand, Flash_Parameter.Stand_Kd);		//0.6
+//												Motor_Set_Flag = 1;
+//												break;
+//			default :  break;	//DelayMs(10);	
+
 		Key = (enum Key)Key_Scan(!Boma_1);	//拨码开关1---0,不支持连续按;1,支持连续按
 		switch(Key)
 		{
@@ -199,14 +242,14 @@ int main(void)
 												ProgramPage(TEST_ADDR_BEIGN, sizeof(Flash_Parameter), (void*)&Flash_Parameter);
 												pidSetKp(&PID_Stand, Flash_Parameter.Stand_Kp);			
 												pidSetKd(&PID_Stand, Flash_Parameter.Stand_Kd);		//0.6
+												pidSetKp(&PID_Speed, Flash_Parameter.Speed_Kp);
 												Motor_Set_Flag = 1;
 												break;
 			default :  break;	//DelayMs(10);	
 		}
 
-		
 		CCD_Report();
-
+		
 	}	//while end
 	
 }	//main end
