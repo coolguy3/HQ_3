@@ -1,6 +1,7 @@
 #ifndef __MYIIC_H__
 #define __MYIIC_H__
 
+#include "gpio.h"
 #include "common.h"
     		   
 //IO∑ΩœÚ…Ë÷√

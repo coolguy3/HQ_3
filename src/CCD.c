@@ -1,7 +1,5 @@
 #include "CCD.h"
-#include "gpio.h"
-#include "adc.h"
-#include "UART_DMA.h"
+
 
 uint8_t IntegrationTime = 10;	//曝光时间  
 uint8_t UART_Buffer_CCD[132] = {0};	//存放采集AD值
@@ -266,19 +264,5 @@ void AccommodFondLine(int8_t *PixelAryy ,uint8_t PixelCount , int16_t *LastLeftP
      
 }
 
-void CCD_Report(void)
-{
-		static uint8_t send_data_cnt = 0;		//决定CCD数据发送周期
-		if(TIME1flag_20ms == 1)
-		{
-			TIME1flag_20ms = 0; 
-			if(++send_data_cnt >= 5) 
-			{
-				send_data_cnt = 0;
-				//只要重复调用这个函数就可以发送不同的数组，但必须注意要确保上一次已经发送完
-				while(DMA_IsMajorLoopComplete(DMA_SEND_CH));
-				UART_SendWithDMA(DMA_SEND_CH, (const uint8_t*)UART_Buffer_CCD, sizeof(UART_Buffer_CCD));		
-			}			
-		}
-}
+
 

@@ -1,5 +1,5 @@
 #include "PID.h"
-#include "UART_DMA.h"
+
 
 struct Quad_PID PID_Stand , PID_Speed;
 
@@ -36,12 +36,15 @@ float PID_Stand_Update()
 	PID_Stand.PID_out = output = 	PID_Stand.outP +
 														PID_Stand.outD;
 
-
-//	temp[0] = PID_Stand.target;
-//	temp[1] = Ang;
-//	temp[2] = PID_Stand.PID_out/10.0;
-//	temp[3] = -Gyro_v;
-//	UART_DMA_Array_Report(sizeof(temp),temp);
+	#ifdef __UART_DMA_PID_Stand_Report__
+	temp[0] = PID_Stand.target;
+	temp[1] = Ang;
+	temp[2] = -Gyro_v;
+	temp[3] = PID_Stand.outP;
+	temp[4] = PID_Stand.outD;
+	temp[5] = PID_Stand.PID_out/10.0;	
+	UART_DMA_Array_Report(sizeof(temp),temp);
+	#endif
 	
   return output;
 }
@@ -72,7 +75,15 @@ float PID_Speed_Update()
 	else
 		PID_Speed.PID_Avg_out = output = 	0;
 	
-//	UART_DMA_Array_Report(sizeof(temp),temp);
+	#ifdef __UART_DMA_PID_Speed_Report__
+	temp[0] = PID_Speed.target;
+	temp[1] = Speed_Car;
+	temp[2] = PID_Speed.outP ;
+	temp[3] = PID_Speed.outI ;
+	temp[4] = PID_Speed.outD ;
+	temp[5] = PID_Speed.PID_Avg_out;	
+	UART_DMA_Array_Report(sizeof(temp),temp);
+	#endif
 	
   return output;
 }

@@ -1,6 +1,9 @@
 #ifndef __PID_H__
 #define __PID_H__
 
+#include "common.h"
+#include "UART_DMA.h"
+
 struct Quad_PID
 {
 	float target;  		// 目标值
@@ -19,7 +22,7 @@ struct Quad_PID
   float outI;         //< integral output (debugging)
   float outD;         //< derivative output (debugging)
 	float PID_out;   		//当前PID的输出
-	float PID_Avg_out;
+	float PID_Avg_out;	//增量平均输出
 		
 };
 

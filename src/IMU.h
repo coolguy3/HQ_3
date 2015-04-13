@@ -2,7 +2,10 @@
 #define __IMU_H__
 
 #include "common.h"
+#include "math.h"
 
+#include "UART_DMA.h"
+#include "IIC.h"
 
 #define	MMA8452_SlaveAddress    0x38	  //SA0 = 0   ---> b0011100 X   MMA8452  通讯地址
 #define	L3G4200D_SlaveAddress   0xD2	  //SDO = 1   ---> b1101001 X   L3G4200D 通讯地址

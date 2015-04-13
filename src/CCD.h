@@ -2,6 +2,8 @@
 #define __CCD_H__
  
 #include "common.h"
+#include "gpio.h"
+#include "adc.h"
 
 #define SI_SetVal()   PCout(4) = 1
 #define SI_ClrVal()   PCout(4) = 0
@@ -14,6 +16,5 @@ void ImageCapture(uint8_t * ImageData);
 void SamplingDelay(void);
 void CalculateIntegrationTime(void);
 uint8_t PixelAverage(uint8_t len, uint8_t *data);
-void CCD_Report(void);
 
 #endif

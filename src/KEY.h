@@ -4,10 +4,10 @@
 #include "common.h"
 #include "gpio.h"
 
-#define Boma_1  PDin(14)
-#define Boma_2  PDin(13)
-#define Boma_3  PDin(12)
-#define Boma_4	PDin(11)
+#define DIP_1  PDin(14)
+#define DIP_2  PDin(13)
+#define DIP_3  PDin(12)
+#define DIP_4	PDin(11)
 
 #define K1			0
 #define K2			1
@@ -16,6 +16,8 @@
 #define K5			4
 
 void Key_Init(void);
+void DIP_Init(void);
+void Bee_Init(void);
 uint8_t Key_Scan(uint8_t mode);
 
 #endif

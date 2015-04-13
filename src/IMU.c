@@ -1,13 +1,5 @@
-#include "IIC.h"
 #include "IMU.h"
-#include "uart.h"
-#include "PID.h"
-#include "UART_DMA.h"
-#include "ftm.h"
 
-//#define ARM_MATH_CM4
-//#include "arm_math.h"
-#include "math.h"
 
 int32_t Gyro_Filter[10] = {0};			//滑动平均滤波缓存数组
 int16_t Gx_Offset=0,Gy_Offset=0,Gz_Offset=0;		//陀螺仪的零偏
@@ -266,7 +258,7 @@ void IMU_Filter(int16_t * GY, int16_t * AX, int16_t * AZ)
 	int i=0;
 	float sum=0;
 	
-	//滑动平均滤波
+	//滑动平均滤波陀螺仪Y轴角速度
 	Gyro_Filter[num] = * GY;
 	for(i=0;i<10;i++)
 		 sum += Gyro_Filter[i];
@@ -282,7 +274,7 @@ void IMU_Filter(int16_t * GY, int16_t * AX, int16_t * AZ)
 /*********************读传感器、滤波、算出角度、PID_Stand*********************/
 void IMU_Update(void)
 {
-	float temp[6] = {0};
+	float temp[3] = {0};
 
 	if( ((IIC_Single_Read(L3G4200D_SlaveAddress,L3G4200D_STATUS_REG) & 0x08)>>3) == 1) //陀螺新数据到来
 		Read_L3G4200D(&Gyro_X,&Gyro_Y,&Gyro_Z);  //读数据 
@@ -303,9 +295,11 @@ void IMU_Update(void)
 	Gyro_v = Gyro_Y_Filtered * 0.07;	//	70mdps/digit	算得角速度，直立PID用到
 	Ang = 0.98 *  (Ang + Gyro_v * 0.005) 	+ 0.02 * Ang_Acc; // 采集周期5ms	 	互补滤波
 	
-	
-//	temp[0] = Ang - 0.02 * Ang_Acc;		//陀螺仪积分
-//	temp[1] = Ang;   									//互补的角度
-//	UART_DMA_Array_Width_Six(temp);
+	#ifdef __UART_DMA_IMU_Report__
+	temp[0] = Ang_Acc;								//用加速度计X轴和Z轴算出来的角度
+	temp[1] = Ang - 0.02 * Ang_Acc;		//陀螺仪积分角度
+	temp[2] = Ang;   									//互补后的角度
+	UART_DMA_Array_Report(sizeof(temp),temp);
+	#endif
 	
 }

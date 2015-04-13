@@ -1,6 +1,5 @@
 #include "IIC.h"
-#include "gpio.h"
-#include "common.h"
+
 
 void Delay(uint32_t time)
 {

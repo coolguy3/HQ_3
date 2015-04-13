@@ -95,6 +95,15 @@ uint32_t UART_SendWithDMA(uint32_t dmaChl, const uint8_t *buf, uint32_t size)
     return 0;
 }
 
+void Uart2_Init(void)
+{
+	UART_QuickInit(UART2_RX_PD02_TX_PD03 , 115200); 			
+//	UART_EnableTxFIFO(HW_UART2, true);
+//	UART_SetTxFIFOWatermark(HW_UART2, UART_GetTxFIFOSize(HW_UART2));
+	UART_ITDMAConfig(HW_UART2, kUART_DMA_Tx, true);
+	UART_DMASendInit(HW_UART2, DMA_SEND_CH, NULL);
+	
+}
 
 /*
 *			功能：用串口DMA发送任意型数据(1~8个)到上位机，显示实时曲线(上位机选择波形数目要看传输的数组长度)
@@ -117,20 +126,38 @@ void UART_DMA_Array_Report(uint8_t cnt , void * Array_Width_Six)
 	
 }
 
+void CCD_Report(void)
+{
+		static uint8_t send_data_cnt = 0;		//决定CCD数据发送周期
+		extern uint8_t TIME1flag_20ms;
+		extern uint8_t UART_Buffer_CCD[132];
+		if(TIME1flag_20ms == 1)
+		{
+			TIME1flag_20ms = 0; 
+			if(++send_data_cnt >= 5) 
+			{
+				send_data_cnt = 0;
+				//只要重复调用这个函数就可以发送不同的数组，但必须注意要确保上一次已经发送完
+				while(DMA_IsMajorLoopComplete(DMA_SEND_CH));
+				UART_SendWithDMA(DMA_SEND_CH, (const uint8_t*)UART_Buffer_CCD, sizeof(UART_Buffer_CCD));		
+			}			
+		}
+}
+
 //测试用UART_DMA_CCD_Report发送一直有乱码出现
 void UART_DMA_CCD_Report(void)	//100ms
 {
 //	extern uint8_t Pixel[];
-	uint8_t temp[132] = {0}, i = 0 ;
-	
-	temp[0] = 0x02;		temp[1] = 0xfd;			//帧头
+//	uint8_t temp[132] = {0}, i = 0 ;
+//	
+//	temp[0] = 0x02;		temp[1] = 0xfd;			//帧头
 //	for( i = 0 ; i < 128 ; i++ )
 //	{
 //		temp[i + 2] = * ( (uint8_t *)Pixel + i);
 //	}
-	temp[128 + 2] = 0xfd;	temp[128 + 3] = 0x02;  	//帧尾
-	
-	while(DMA_IsMajorLoopComplete(DMA_SEND_CH)){;}
-  UART_SendWithDMA(DMA_SEND_CH, (const uint8_t*)temp, 128 + 4);
+//	temp[128 + 2] = 0xfd;	temp[128 + 3] = 0x02;  	//帧尾
+//	
+//	while(DMA_IsMajorLoopComplete(DMA_SEND_CH)){;}
+//  UART_SendWithDMA(DMA_SEND_CH, (const uint8_t*)temp, 128 + 4);
 
 }

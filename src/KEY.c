@@ -8,15 +8,28 @@ void Key_Init(void)
 	GPIO_QuickInit(HW_GPIOE, 10, kGPIO_Mode_IPU);
 	GPIO_QuickInit(HW_GPIOE, 11, kGPIO_Mode_IPU);
 	GPIO_QuickInit(HW_GPIOE, 12, kGPIO_Mode_IPU);
+	
+}
+
+void DIP_Init(void)
+{
 	//拨码开关	上拉输入
 	GPIO_QuickInit(HW_GPIOD, 11, kGPIO_Mode_IPU);
 	GPIO_QuickInit(HW_GPIOD, 12, kGPIO_Mode_IPU);
 	GPIO_QuickInit(HW_GPIOD, 13, kGPIO_Mode_IPU);
 	GPIO_QuickInit(HW_GPIOD, 14, kGPIO_Mode_IPU);
+
+}
+
+
+void Bee_Init(void)
+{
 	//蜂鸣器		推挽输出
 	GPIO_QuickInit(HW_GPIOB, 22, kGPIO_Mode_OPP);
 	GPIO_SetBit(HW_GPIOB, 22);			//关闭蜂鸣器
+
 }
+
 
 uint8_t Key_Scan(uint8_t mode)
 {	 
