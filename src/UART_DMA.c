@@ -128,20 +128,11 @@ void UART_DMA_Array_Report(uint8_t cnt , void * Array_Width_Six)
 
 void CCD_Report(void)
 {
-		static uint8_t send_data_cnt = 0;		//决定CCD数据发送周期
-		extern uint8_t TIME1flag_20ms;
 		extern uint8_t UART_Buffer_CCD[132];
-		if(TIME1flag_20ms == 1)
-		{
-			TIME1flag_20ms = 0; 
-			if(++send_data_cnt >= 5) 
-			{
-				send_data_cnt = 0;
-				//只要重复调用这个函数就可以发送不同的数组，但必须注意要确保上一次已经发送完
-				while(DMA_IsMajorLoopComplete(DMA_SEND_CH));
-				UART_SendWithDMA(DMA_SEND_CH, (const uint8_t*)UART_Buffer_CCD, sizeof(UART_Buffer_CCD));		
-			}			
-		}
+		//只要重复调用这个函数就可以发送不同的数组，但必须注意要确保上一次已经发送完
+		while(DMA_IsMajorLoopComplete(DMA_SEND_CH));
+		UART_SendWithDMA(DMA_SEND_CH, (const uint8_t*)UART_Buffer_CCD, sizeof(UART_Buffer_CCD));		
+
 }
 
 //测试用UART_DMA_CCD_Report发送一直有乱码出现

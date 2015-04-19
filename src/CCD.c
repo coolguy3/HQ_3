@@ -1,9 +1,8 @@
 #include "CCD.h"
 
 
-uint8_t IntegrationTime = 10;	//曝光时间  
+uint8_t IntegrationTime = 2;	//曝光时间  
 uint8_t UART_Buffer_CCD[132] = {0};	//存放采集AD值
-uint8_t TIME1flag_20ms = 0 ;	//20ms标志位
 
 //************求均值**************************
 uint8_t PixelAverage(uint8_t len, uint8_t *data) 
@@ -138,19 +137,19 @@ void CalculateIntegrationTime(void)
       PixelAverageVoltageError /= 2;				//  ??
       if(PixelAverageVoltageError > 10 )		//防止调节太快			！！！
          PixelAverageVoltageError = 10 ;
-       IntegrationTime -= PixelAverageVoltageError;
+       IntegrationTime -= PixelAverageVoltageError/6.666;
     }
     if(PixelAverageVoltageError > TargetPixelAverageVoltageAllowError)
     { 
         PixelAverageVoltageError /= 2;
         if(PixelAverageVoltageError > 10 )
            PixelAverageVoltageError = 10 ;
-        IntegrationTime += PixelAverageVoltageError;}
+        IntegrationTime += PixelAverageVoltageError/6.666;}
  
     if(IntegrationTime <= 1)			//积分时间限幅   ！！！
         IntegrationTime = 1;
-    if(IntegrationTime >= 100)
-        IntegrationTime = 100;
+    if(IntegrationTime >= 15)
+        IntegrationTime = 15;
 		
 }
 

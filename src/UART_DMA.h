@@ -20,11 +20,14 @@
 //	( 3 , float )	Speed_Left ; Speed_Right ; Speed_Car
 //#define __UART_DMA_Speed_Measure_Report__
 
-//	( 6 , float )	PID_Speed.target ; Speed_Car ; PID_Speed.outP ; PID_Speed.outI ; PID_Speed.outD ; PID_Speed.PID_Avg_out
-#define __UART_DMA_PID_Speed_Report__
+//	( 6 , float )	PID_Speed.target ; Speed_Car ; PID_Speed.outP ; PID_Speed.outI ; PID_Speed.outD ; output
+//#define __UART_DMA_PID_Speed_Report__
+
+
+//#define __UART_DMA_PID_Turn_Report__
 
 //	CCD
-//#define __UART_DMA_CCD_Report__
+#define __UART_DMA_CCD_Report__
 
 
 void UART_DMASendInit(uint32_t uartInstnace, uint8_t dmaChl, uint8_t * txBuf);

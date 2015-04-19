@@ -2,6 +2,7 @@
 #include "ZIKU.h"
 
 uint8_t OLED_GRAM[128][8];
+enum Key { Key_Up,Key_Down,Key_Left,Key_Right,Key_Enter,No_Key	} Key;
 struct Parameter						//FLASH保存的参数，每次初始化后都从FLASH读出保存的参数，调整后用按键Enter键保存
 {
 	float Stand_Kp,Stand_Kd;
@@ -394,14 +395,59 @@ int MKP512FlashInit(void)
     return Init(0x00000000, clock, 2); 
 }
 
+void Motor_Test()
+{
+	uint16_t Duty1 = 5000 , Duty2 = 5000;
+	uint8_t Test_Finished = 0;
+	while(1)
+	{
+				
+		Key = (enum Key)Key_Scan(!DIP_1);
+		switch(Key)
+		{
+			case Key_Up			:	Duty1 += 100;				// 0-10000 对应占空比 0-100%
+												if(Duty1 > 10000)	Duty1 = 10000;
+												FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH3 , Duty1);		
+												OLED_Show_Data(0,0,Duty1);
+												break;	
+			case Key_Down		: Duty1 -= 100;
+												if(Duty1 < 0)			Duty1 = 0;			
+												FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH3 , Duty1);		
+												OLED_Show_Data(0,0,Duty1);
+												break;	//右轮
+			case Key_Left		: Duty2 += 100;	
+												if(Duty2 > 10000)	Duty2 = 10000;
+												FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH4 , Duty2);		
+												OLED_Show_Data(0,1,Duty2);
+												break;	//左轮
+			case Key_Right	: Duty2 -= 100;	
+												if(Duty2 < 0)			Duty2 = 0;			
+												FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH4 , Duty2);		
+												OLED_Show_Data(0,1,Duty2);
+												break;
+			case Key_Enter	: Test_Finished = 1;	
+												FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH3 , 5000);
+												FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH4 , 5000);
+												break;
+			default :  					DelayMs(10);				break;	
+		}
+		
+		if(Test_Finished)
+		{
+			break;
+		}
+		
+	}
+}
+
 	
 void OLED_UI()
 {
 	extern struct Quad_PID PID_Stand , PID_Speed;
 
-	enum Key { Key_Up,Key_Down,Key_Left,Key_Right,Key_Enter,No_Key	} Key;
 	static int8_t OLED_Show = 0;				//OLED显示的界面号
 	static float * OLED_Adjust = 0;		//存放需要OLED调整的参数的指针
+	float Null = 0;
 	
 	Key = (enum Key)Key_Scan(!DIP_1);	//第一个拨码开关---0,不支持连续按;1,支持连续按
 	switch(Key)
@@ -412,13 +458,8 @@ void OLED_UI()
 		case Key_Right	: OLED_Show++;	OLED_Fill(0x00);	if(OLED_Show > 6)OLED_Show = 0;			break;
 		case Key_Enter	:	EraseSector(TEST_ADDR_BEIGN);
 											ProgramPage(TEST_ADDR_BEIGN, sizeof(Flash_Parameter), (void*)&Flash_Parameter);		//保存参数到FLASH
-											pidSetTarget(&PID_Stand,44);	//设置车直立的倾角
-											pidSetTarget(&PID_Speed,0);		//设置目标速度
-											pidSetKp(&PID_Stand, Flash_Parameter.Stand_Kp);			
-											pidSetKd(&PID_Stand, Flash_Parameter.Stand_Kd);		//0.6
-											pidSetKp(&PID_Speed, Flash_Parameter.Speed_Kp);
-											pidSetKi(&PID_Speed, Flash_Parameter.Speed_Ki);
-											pidSetKd(&PID_Speed, Flash_Parameter.Speed_Kd);
+											pidInit(&PID_Stand, Flash_Parameter.Stand_Kp , 0 , Flash_Parameter.Stand_Kd , 44);	//REset pid各值，并更新参数
+											pidInit(&PID_Speed, Flash_Parameter.Speed_Kp , Flash_Parameter.Speed_Ki , Flash_Parameter.Speed_Kd , 0);
 											Motor_Set_Flag = 1;
 											break;
 		default : DelayMs(20);	 break;	
@@ -430,6 +471,7 @@ void OLED_UI()
 								OLED_P6x8Str(0*6,1,"Kp: ");	OLED_Show_Float(4,1,Flash_Parameter.Stand_Kp);
 								OLED_P6x8Str(0*6,2,"Ki: ");	OLED_Show_Float(4,2,0);
 								OLED_P6x8Str(0*6,3,"Kd: ");	OLED_Show_Float(4,3,Flash_Parameter.Stand_Kd);
+								OLED_Adjust = &Null;
 								break;	
 		case 1	:		OLED_P6x8Str(0,0,"Stand_PID_Parameter:");
 								OLED_P6x8Str(0*6,1,"Kp: ");	OLED_Show_Float(4,1,Flash_Parameter.Stand_Kp);
@@ -444,6 +486,7 @@ void OLED_UI()
 								OLED_P6x8Str(0*6,1,"Kp: ");	OLED_Show_Float(4,1,Flash_Parameter.Speed_Kp);
 								OLED_P6x8Str(0*6,2,"Ki: ");	OLED_Show_Float(4,2,Flash_Parameter.Speed_Ki);
 								OLED_P6x8Str(0*6,3,"Kd: ");	OLED_Show_Float(4,3,Flash_Parameter.Speed_Kd);
+								OLED_Adjust = &Null;
 								break;
 		case 4	:		OLED_P6x8Str(0,0,"Speed_PID_Parameter:");
 								OLED_P6x8Str(0*6,1,"Kp: ");	OLED_Show_Float(4,1,Flash_Parameter.Speed_Kp);

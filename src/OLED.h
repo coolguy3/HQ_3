@@ -3,6 +3,7 @@
 
 #include "common.h"  
 #include "FlashOS.H"
+#include "ftm.h" 
 
 #include "KEY.h"
 #include "PID.h"
@@ -56,6 +57,7 @@ void OLED_Fill(uint8_t bmp_dat);  //bmp_dat=0x00全屏灭,bmp_dat=0xff全屏亮
 void OLED_P6x8Str(uint8_t x, uint8_t y,char ch[]);		//显示6*8一组标准ASCII字符串	显示的坐标（x,y），y为页范围0～7
 void OLED_Show_Data(uint8_t x,uint8_t y,int32_t var);
 void OLED_Show_Float(uint8_t x,uint8_t y,float var);	//显示一位小数的百位数浮点型数据 
+void Motor_Test(void);
 void OLED_UI(void);
 /************************FLASH*******************************/
 /* chip's Flash size and sector size can be found in RM */
