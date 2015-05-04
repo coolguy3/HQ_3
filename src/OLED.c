@@ -5,9 +5,11 @@ uint8_t OLED_GRAM[128][8];
 enum Key { Key_Up,Key_Down,Key_Left,Key_Right,Key_Enter,No_Key	} Key;
 struct Parameter						//FLASH保存的参数，每次初始化后都从FLASH读出保存的参数，调整后用按键Enter键保存
 {
-	float Stand_Kp,Stand_Kd;
-	float Speed_Kp,Speed_Ki,Speed_Kd;
-}Flash_Parameter;
+	float Stand_Kp , Stand_Kd ;
+	float Speed_Kp , Speed_Ki , Speed_Kd;
+	float Ang_Set , Speed_Set ;
+	float Turn_Kp , Turn_Kd ;
+}Flash_Parameter;					//新添加的参数一定要按顺序添加在最后。。
 uint8_t Motor_Set_Flag = 0;	//按键Enter键控制，是否开启电机控制
 
 void OLED_Delay(uint32_t time)
@@ -399,9 +401,9 @@ void Motor_Test()
 {
 	uint16_t Duty1 = 5000 , Duty2 = 5000;
 	uint8_t Test_Finished = 0;
+	
 	while(1)
-	{
-				
+	{		
 		Key = (enum Key)Key_Scan(!DIP_1);
 		switch(Key)
 		{
@@ -434,6 +436,7 @@ void Motor_Test()
 		
 		if(Test_Finished)
 		{
+			DelayMs(200);			//延时防止Enter键连续触发
 			break;
 		}
 		
@@ -443,63 +446,101 @@ void Motor_Test()
 	
 void OLED_UI()
 {
-	extern struct Quad_PID PID_Stand , PID_Speed;
-
+	extern struct Quad_PID PID_Stand , PID_Speed , PID_Turn;
 	static int8_t OLED_Show = 0;				//OLED显示的界面号
 	static float * OLED_Adjust = 0;		//存放需要OLED调整的参数的指针
 	float Null = 0;
-	
+	extern uint8_t UART_Buffer_CCD[132],PixelAverageValue,Left,Right,Mid,Mid_Pre[3],road_state;
 	Key = (enum Key)Key_Scan(!DIP_1);	//第一个拨码开关---0,不支持连续按;1,支持连续按
 	switch(Key)
 	{
 		case Key_Up			:	*OLED_Adjust += 0.1;			break;	
 		case Key_Down		: *OLED_Adjust -= 0.1;			break;	
 		case Key_Left		: OLED_Show--;	OLED_Fill(0x00);	if(OLED_Show < 0)OLED_Show = 0;			break;	
-		case Key_Right	: OLED_Show++;	OLED_Fill(0x00);	if(OLED_Show > 6)OLED_Show = 0;			break;
+		case Key_Right	: OLED_Show++;	OLED_Fill(0x00);	if(OLED_Show > 12)OLED_Show = 0;			break;
 		case Key_Enter	:	EraseSector(TEST_ADDR_BEIGN);
 											ProgramPage(TEST_ADDR_BEIGN, sizeof(Flash_Parameter), (void*)&Flash_Parameter);		//保存参数到FLASH
-											pidInit(&PID_Stand, Flash_Parameter.Stand_Kp , 0 , Flash_Parameter.Stand_Kd , 44);	//REset pid各值，并更新参数
-											pidInit(&PID_Speed, Flash_Parameter.Speed_Kp , Flash_Parameter.Speed_Ki , Flash_Parameter.Speed_Kd , 0);
+											pidInit(&PID_Stand, Flash_Parameter.Stand_Kp , 0 , Flash_Parameter.Stand_Kd , Flash_Parameter.Ang_Set);	//REset pid各值，并更新参数
+											pidInit(&PID_Speed, 111 , 0.6 , 3.6 ,0);	//直立的速度PID
+											pidInit(&PID_Turn, Flash_Parameter.Turn_Kp , 0 , Flash_Parameter.Turn_Kd , 0);	
 											Motor_Set_Flag = 1;
 											break;
-		default : DelayMs(20);	 break;	
+		default : DelayMs(10);	 break;	
 	}
-	
+
 	switch(OLED_Show)
 	{
-		case 0	:		OLED_P6x8Str(0,0,"Stand_PID_Parameter:");
+		//	CCD
+		case 0	:		OLED_P6x8Str(0,0,"AverageValue: ");OLED_Show_Float(13,0,PixelAverageValue);
+								OLED_P6x8Str(0,1,"Road State: ");OLED_Show_Float(11,1,road_state);
+								OLED_P6x8Str(0,2,"Left: ");OLED_Show_Float(5,2,Left);
+								OLED_P6x8Str(0,3,"Right: ");OLED_Show_Float(6,3,Right);
+								OLED_P6x8Str(0,4,"Mid: ");OLED_Show_Float(5,4,Mid);
+								OLED_P6x8Str(0,5,"Last Mid: ");OLED_Show_Float(10,5,Mid_Pre[2]);							
+								break;
+		
+		//	角度
+		case 1	:		OLED_P6x8Str(0,0,"Stand_PID_Parameter:");
 								OLED_P6x8Str(0*6,1,"Kp: ");	OLED_Show_Float(4,1,Flash_Parameter.Stand_Kp);
-								OLED_P6x8Str(0*6,2,"Ki: ");	OLED_Show_Float(4,2,0);
 								OLED_P6x8Str(0*6,3,"Kd: ");	OLED_Show_Float(4,3,Flash_Parameter.Stand_Kd);
+								OLED_P6x8Str(0*6,4,"Ang_Set: ");	OLED_Show_Float(10,4,Flash_Parameter.Ang_Set);
 								OLED_Adjust = &Null;
 								break;	
-		case 1	:		OLED_P6x8Str(0,0,"Stand_PID_Parameter:");
+		case 2	:		OLED_P6x8Str(0,0,"Stand_PID_Parameter:");
 								OLED_P6x8Str(0*6,1,"Kp: ");	OLED_Show_Float(4,1,Flash_Parameter.Stand_Kp);
 								OLED_Adjust = &Flash_Parameter.Stand_Kp;
 								break;
-		case 2	:		OLED_P6x8Str(0,0,"Stand_PID_Parameter:");
+		case 3	:		OLED_P6x8Str(0,0,"Stand_PID_Parameter:");
 								OLED_P6x8Str(0*6,3,"Kd: ");	OLED_Show_Float(4,3,Flash_Parameter.Stand_Kd);
 								OLED_Adjust = &Flash_Parameter.Stand_Kd;
 								break;
+		case 4	:		OLED_P6x8Str(0,0,"Stand_PID_Parameter:");
+								OLED_P6x8Str(0*6,4,"Ang_Set: ");	OLED_Show_Float(10,4,Flash_Parameter.Ang_Set);
+								OLED_Adjust = &Flash_Parameter.Ang_Set;								
+								break;
 		
-		case 3	:		OLED_P6x8Str(0,0,"Speed_PID_Parameter:");
+		//速度
+		case 5	:		OLED_P6x8Str(0,0,"Speed_PID_Parameter:");
 								OLED_P6x8Str(0*6,1,"Kp: ");	OLED_Show_Float(4,1,Flash_Parameter.Speed_Kp);
 								OLED_P6x8Str(0*6,2,"Ki: ");	OLED_Show_Float(4,2,Flash_Parameter.Speed_Ki);
 								OLED_P6x8Str(0*6,3,"Kd: ");	OLED_Show_Float(4,3,Flash_Parameter.Speed_Kd);
+								OLED_P6x8Str(0*6,4,"Speed_Set: ");	OLED_Show_Float(10,4,Flash_Parameter.Speed_Set);
 								OLED_Adjust = &Null;
 								break;
-		case 4	:		OLED_P6x8Str(0,0,"Speed_PID_Parameter:");
+		case 6	:		OLED_P6x8Str(0,0,"Speed_PID_Parameter:");
 								OLED_P6x8Str(0*6,1,"Kp: ");	OLED_Show_Float(4,1,Flash_Parameter.Speed_Kp);
 								OLED_Adjust = &Flash_Parameter.Speed_Kp;
 								break;
-		case 5	:		OLED_P6x8Str(0,0,"Speed_PID_Parameter:");
+		case 7	:		OLED_P6x8Str(0,0,"Speed_PID_Parameter:");
 								OLED_P6x8Str(0*6,2,"Ki: ");	OLED_Show_Float(4,2,Flash_Parameter.Speed_Ki);
 								OLED_Adjust = &Flash_Parameter.Speed_Ki;
 								break;						
-		case 6	:		OLED_P6x8Str(0,0,"Speed_PID_Parameter:");
+		case 8	:		OLED_P6x8Str(0,0,"Speed_PID_Parameter:");
 								OLED_P6x8Str(0*6,3,"Kd: ");	OLED_Show_Float(4,3,Flash_Parameter.Speed_Kd);
 								OLED_Adjust = &Flash_Parameter.Speed_Kd;
 								break;
+		case 9	:		OLED_P6x8Str(0,0,"Speed_PID_Parameter:");
+								OLED_P6x8Str(0*6,4,"Speed_Set: ");	OLED_Show_Float(10,4,Flash_Parameter.Speed_Set);
+								OLED_Adjust = &Flash_Parameter.Speed_Set;
+								break;
+								
+		//	转向
+		case 10	:		OLED_P6x8Str(0,0,"Turn_PID_Parameter:");
+								OLED_P6x8Str(0*6,1,"Kp: ");	OLED_Show_Float(4,1,Flash_Parameter.Turn_Kp);
+								OLED_P6x8Str(0*6,3,"Kd: ");	OLED_Show_Float(4,3,Flash_Parameter.Turn_Kd);
+								OLED_Adjust = &Null;
+								break;	
+		case 11	:		OLED_P6x8Str(0,0,"Turn_PID_Parameter:");
+								OLED_P6x8Str(0*6,1,"Kp: ");	OLED_Show_Float(4,1,Flash_Parameter.Turn_Kp);
+						//		OLED_Adjust = &Flash_Parameter.Turn_Kp;
+								Flash_Parameter.Turn_Kp = 3;
+								break;
+		case 12	:		OLED_P6x8Str(0,0,"Turn_PID_Parameter:");
+								OLED_P6x8Str(0*6,3,"Kd: ");	OLED_Show_Float(4,3,Flash_Parameter.Turn_Kd);
+						//		OLED_Adjust = &Flash_Parameter.Turn_Kd;
+								Flash_Parameter.Turn_Kd = 0.3;
+								break;
+
 	}
 	
 }

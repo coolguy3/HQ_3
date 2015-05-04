@@ -1,7 +1,13 @@
 #include "CTRL.h"
 
+extern struct Quad_PID PID_Stand , PID_Speed , PID_Turn;
+extern struct Parameter{
+	float Stand_Kp , Stand_Kd ;
+	float Speed_Kp , Speed_Ki , Speed_Kd;
+	float Ang_Set , Speed_Set ;
+}	Flash_Parameter;	
 
-//因机械摩擦存在电机死区、宏定义轮子开始转的占空比、需实验测得    竞赛时都取5000
+//因机械摩擦存在电机死区、宏定义轮子开始转的占空比、需实验测得    竞赛时都取5000 ???
 #define	MOTOT_DEADLINE_LEFT_POS	5500			//加电机死区
 #define	MOTOT_DEADLINE_LEFT_NEG	4500
 #define	MOTOT_DEADLINE_RIGHT_POS	5400
@@ -20,7 +26,8 @@ float Speed_Car = 0;
 static void PIT0_ISR(void)
 {
 		static uint8_t Count_Flag = 0;		//5ms标志位
-		static uint8_t Speed_Flag = 0;
+		static uint8_t Speed_Flag = 0 , Speed_Ctrl_Flag = 0;
+		static uint16_t Speed_Ctrl_Cnt;
 		extern uint8_t IntegrationTime;       //曝光时间
 		extern uint8_t UART_Buffer_CCD[132];						//存放采集AD值
 		static uint8_t TimerCnt15ms = 0;
@@ -44,7 +51,16 @@ static void PIT0_ISR(void)
 			IMU_Update();   		//读姿态传感器、滤波、算角度
 			PID_Stand_Update();
 			if(Motor_Set_Flag)
+			{
 				Motor_Set();
+				Speed_Ctrl_Cnt++;
+				if(Speed_Ctrl_Cnt == 400)		//站两秒再跑
+				{
+					//改成跑起来的参数
+					pidInit(&PID_Speed, Flash_Parameter.Speed_Kp , Flash_Parameter.Speed_Ki , Flash_Parameter.Speed_Kd ,Flash_Parameter.Speed_Set);
+				}	
+				if(Speed_Ctrl_Cnt > 500) Speed_Ctrl_Cnt = 500;
+			}
 		}
 		
 		if(Count_Flag == 3)		
@@ -64,7 +80,7 @@ static void PIT0_ISR(void)
 			if(Speed_Flag == 15)
 			{
 				Speed_Flag = 0;
-			}		
+			}			
 		}
 		
 		if(Count_Flag == 5)		//方向	20ms控计算	5ms控制
@@ -74,6 +90,8 @@ static void PIT0_ISR(void)
 				TimerCnt15ms = 0;
 				ImageCapture(UART_Buffer_CCD + 2);					//CCD采样程序,函数里有参数需调整
 				CalculateIntegrationTime();		//根据采集的平均电压(代替光强)，反馈计算曝光时间
+				Recognize_Road();
+		//		PID_Turn_Update();
 				#ifdef __UART_DMA_CCD_Report__
 				CCD_Report();
 				#endif
@@ -179,6 +197,7 @@ void Motor_Set()
 {
 	extern float Ang;			//用于倾角异常停机
 	extern struct Quad_PID PID_Stand , PID_Speed , PID_Turn;
+	extern uint8_t Motor_Set_Flag;
 	int16_t Motor_Left = 0,Motor_Right = 0,Duty_Left = 0,Duty_Right = 0;
 	
 	PID_Speed.PID_out += PID_Speed.PID_Avg_out;
@@ -228,6 +247,7 @@ void Motor_Set()
 	{
 		Duty_Left = 5000;
 		Duty_Right = 5000;
+		Motor_Set_Flag = 0;
 	}
 	
 	FTM_PWM_ChangeDuty(HW_FTM0, HW_FTM_CH4 , Duty_Left);

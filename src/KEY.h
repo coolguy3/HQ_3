@@ -7,7 +7,7 @@
 #define DIP_1  PDin(14)
 #define DIP_2  PDin(13)
 #define DIP_3  PDin(12)
-#define DIP_4	PDin(11)
+#define DIP_4	 PDin(11)
 
 #define K1			0
 #define K2			1

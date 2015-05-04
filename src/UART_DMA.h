@@ -36,7 +36,7 @@ uint32_t UART_SendWithDMA(uint32_t dmaChl, const uint8_t *buf, uint32_t size);
 
 void Uart2_Init(void);
 void UART_DMA_Array_Report(uint8_t cnt , void * Array_Width_Six);
-void UART_DMA_CCD_Report(void);
+//void UART_DMA_CCD_Report(void);
 void CCD_Report(void);
 
 #endif

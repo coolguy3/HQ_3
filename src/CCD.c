@@ -1,9 +1,13 @@
 #include "CCD.h"
 
-
 uint8_t IntegrationTime = 2;	//曝光时间  
-uint8_t UART_Buffer_CCD[132] = {0};	//存放采集AD值
-
+uint8_t UART_Buffer_CCD[132] = {0};	//存放Report的AD值
+uint8_t	Pixel[128] = {0};	//存放采集的AD值
+//中线位置，CCD均值，跳边沿阈值(22-30间)，左右线,赛道宽度
+uint8_t Mid=64,PixelAverageValue,CCD_Threshold=10,RoadWith;
+int16_t Left,Right;
+uint8_t Mid_Pre[3] = {64} , Left_Pre[3] = {0}  , Right_Pre[3] = {0} , RoadWith_Pre[3] = {0} ;
+uint8_t road_state;
 //************求均值**************************
 uint8_t PixelAverage(uint8_t len, uint8_t *data) 
 {
@@ -76,7 +80,7 @@ void StartIntegration(void)
 //***************CCD采样程序******************************
 void ImageCapture(uint8_t * ImageData) 
 {
-	uint8_t i;
+	uint8_t i , *p = Pixel;
 	extern uint8_t AtemP ;
 
 	SI_SetVal();            /* SI  = 1 */
@@ -93,7 +97,10 @@ void ImageCapture(uint8_t * ImageData)
 	}
 
 	*ImageData =  ADC_QuickReadValue(ADC1_SE4B_PC8);
+	*p = *ImageData;
 	ImageData ++ ;
+	p++ ;
+	
 	CLK_ClrVal();         /* CLK = 0 */
 	for(i=0; i<127; i++) 
 	{
@@ -103,7 +110,9 @@ void ImageCapture(uint8_t * ImageData)
 		SamplingDelay();
 		SamplingDelay();
 		*ImageData =  ADC_QuickReadValue(ADC1_SE4B_PC8);
+		*p = *ImageData;
 		ImageData ++ ;
+		p++ ;
 		CLK_ClrVal();       /* CLK = 0 */
 	}
 	
@@ -118,8 +127,7 @@ void ImageCapture(uint8_t * ImageData)
 //***************计算曝光时间，单位ms **************************
 void CalculateIntegrationTime(void) 
 {
-		extern uint8_t Pixel[128];
-		uint8_t PixelAverageValue;		//AD均值
+		extern uint8_t PixelAverageValue;		//AD均值
 		uint8_t PixelAverageVoltage;	//实际电压均值 电压都放大10倍
 		int16_t TargetPixelAverageVoltage = 25;		//目标电压均值    ！！！
 		int16_t PixelAverageVoltageError = 0;			//偏差
@@ -153,115 +161,173 @@ void CalculateIntegrationTime(void)
 		
 }
 
-
-//*********************自己适应算黑线位置算法*************************************
-#define LINEBREADTH    10 
-#define LINECONCAT     8
-void AccommodFondLine(int8_t *PixelAryy ,uint8_t PixelCount , int16_t *LastLeftPixelStation,int16_t *LastRingtPixelStation,uint8_t FAVAULE)
+//识别黑线，计算中线
+void Get_Line(void) 
 {
-  static uint8_t NOLeftCount,NORightCout ;
-  int16_t temp0B ,temp1B,temp2B,temp3B;
-  uint8_t *LineStation ,LineCount ,*LineLeftStation,*LineRightStation;
-  int16_t LeftMIN,LeftMAX,RightMIN,RightMAX;
-  LineCount = 0 ;
-  for(temp0B = 0 ; temp0B < PixelCount ; temp0B ++)
-  {
-    temp1B = temp0B ;
-    temp2B = 0 ;
-    /***********
-    查找左边凹槽
-    ***********/
-    while(temp2B <= LINEBREADTH) {
-      temp1B -- ;
-      if(temp1B < 0)
-        break ;
-      if( PixelAryy[temp1B] -  PixelAryy[temp0B] > FAVAULE )
-      { temp2B ++ ;}
-      else if(temp2B)
-      { break ; }
-   
-    }
-     
-    /***********
-    查找右边凹槽
-    ***********/
-    temp1B = temp0B ;
-    temp3B = 0 ;
-    while(temp3B <= LINEBREADTH)
-    {
-      temp1B ++ ;
-      if(temp1B > PixelCount)
-      { break ; }
-      if( PixelAryy[temp1B] -  PixelAryy[temp0B] > FAVAULE )
-      { temp3B ++ ;}
-      else if(temp3B)
-      { break ; }
-    }
-    /***********
-    记录黑线位置
-    ***********/    
-    if(temp2B >= LINEBREADTH ){
-      *LineStation = temp0B ;
-      LineCount ++ ;
-    }else if(temp3B >= LINEBREADTH ){
-      *LineStation = temp0B ;
-      LineCount ++ ;
-    }
-		
+//	extern uint8_t PixelAverageValue;
+//	CCD_Threshold = PixelAverageValue/2-24;
+	uint8_t Maxfind = 33 , i = 0;
+	int16_t Looptmp1 , Looptmp2;
+	
+	//找左线
+	if( Mid_Pre[2] > 124)
+	{
+		Looptmp1 = 124;
+	}
+	else
+	{
+		Looptmp1 = Mid_Pre[2];
 	}
 	
-  /**********
-  根据连续性查找左右黑线位置
-  **********/
-  if(LineCount)
-  {
-    temp2B = PixelCount >> 1 ;
-    temp1B = NOLeftCount << 1;
-    temp1B += LINECONCAT;
-    LeftMIN = *LastLeftPixelStation - temp1B ;
-    LeftMAX = *LastRingtPixelStation + temp1B ;
-    if(LeftMIN < 0)
-      LeftMIN = 0 ;
-
-    if(LeftMAX > (temp2B + 1))
-      LeftMAX  = temp2B + 1 ;
-    
-    RightMIN = *LastRingtPixelStation - temp1B ;
-    RightMAX = *LastRingtPixelStation + temp1B ;
-    if(RightMAX > PixelCount)
-       RightMAX = PixelCount ;
-    if(RightMIN < (temp2B - 1))
+	//Maxfind稍大于最近几次赛道宽度
+	if( Mid_Pre[2] - Maxfind > 3)
+	{
+		Looptmp2 = Mid_Pre[2] - Maxfind;
+	}
+	else
+	{
+		Looptmp2 = 3;
+	}
+	
+	Left = -1;//检测不到黑线时都为-1
+	for( i = Looptmp1 ; i >= Looptmp2 ; i--)
+	{
+		if(			Pixel[i]+4 <= Pixel[i+1]
+				&&	Pixel[i+1]+4 <= Pixel[i+2]
+				&& 	Pixel[i+2]+4 <= Pixel[i+3] 
+				&& 	Pixel[i+3]-Pixel[i] >= CCD_Threshold
+				&& 	i <= Mid_Pre[2]		)
 		{
-       RightMIN = temp2B - 1 ;
-    }
-    temp2B = 0 ;
-    temp3B = 0 ;
-		for(temp1B = 0 ;temp1B < LineCount ;temp1B ++ )
-		{
-			if( (LeftMIN < LineStation[temp1B])&&(LineStation[temp1B]<LeftMAX))
-			{
-				LineLeftStation[temp2B] = LineStation[temp1B] ;
-				temp2B ++ ;
-			}else if( (RightMIN < LineStation[temp1B])&&(LineStation[temp1B]<RightMAX))
-			{
-				LineRightStation[temp3B] = LineStation[temp1B] ;
-				temp3B ++ ;
-			} 
+			Left = i ;
+			break;
 		}
-    
-  }
-	else 
-  {
-    NOLeftCount ++ ;
-    NORightCout ++ ;
-  }
-  
-  if(temp2B)
-  {
-    NOLeftCount = 0 ;
-  }
-     
+	}	
+	Left_Pre[0] =  Left_Pre[1] ;
+	Left_Pre[1] =  Left_Pre[2] ;
+	Left_Pre[2] =  Left;
+	
+	//找右线
+	if( Mid_Pre[2] < 3)
+	{
+		Looptmp1 = 3;
+	}
+	else
+	{
+		Looptmp1 = Mid_Pre[2];
+	}
+	
+	//Maxfind稍大于最近几次赛道宽度的一半
+	if( Mid_Pre[2] + Maxfind < 125)
+	{
+		Looptmp2 = Mid_Pre[2] + Maxfind;
+	}
+	else
+	{
+		Looptmp2 = 125;
+	}
+	
+	Right = -1;//检测不到黑线时都为-1
+	for(i = Looptmp1 ; i <= Looptmp2 ; i++)
+	{
+		if(			Pixel[i]+4 <= Pixel[i-1]
+				&& 	Pixel[i-1]+4 <= Pixel[i-2] 
+				&& 	Pixel[i-2]+4 <= Pixel[i-3]
+				&& 	Pixel[i-3]-Pixel[i] >= CCD_Threshold
+				&&  i >= Mid_Pre[2]		 )
+		{
+			Right = i ;
+			break;
+		}
+	}	
+	Right_Pre[0] =  Right_Pre[1] ;
+	Right_Pre[1] =  Right_Pre[2] ;
+	Right_Pre[2] =  Right;
+	
 }
 
 
+//均值数据滤波
+void Filter_Pixel(void)
+{
+	unsigned char i;
+	for(i=1;i<127;i++)
+	{
+		if(UART_Buffer_CCD[i+2]==0&&UART_Buffer_CCD[i+2]!=UART_Buffer_CCD[i+1]&&UART_Buffer_CCD[i]!=UART_Buffer_CCD[i+3])
+		{
+			UART_Buffer_CCD[i+2]=250;
+		} 
+		else if(UART_Buffer_CCD[i+2]==250&&UART_Buffer_CCD[i+2]!=UART_Buffer_CCD[i+1]&&UART_Buffer_CCD[i+2]!=UART_Buffer_CCD[i+3])
+		{
+			UART_Buffer_CCD[i+2]=0;
+		}
+
+		if(UART_Buffer_CCD[i+2]==0&&UART_Buffer_CCD[i+2]!=UART_Buffer_CCD[i+1]&&UART_Buffer_CCD[i+2]!=UART_Buffer_CCD[i+3])
+		{
+			UART_Buffer_CCD[i+2]=250;
+		} 
+		else if(UART_Buffer_CCD[i+2]==250&&UART_Buffer_CCD[i+2]!=UART_Buffer_CCD[i+1]&&UART_Buffer_CCD[i+2]!=UART_Buffer_CCD[i+3])
+		{
+			UART_Buffer_CCD[i+2]=0;
+		}
+	}
+
+	//黑线上的点数超过3时使用
+	for(i=1;i<126;i++)
+	{
+		if(UART_Buffer_CCD[i]==0&&UART_Buffer_CCD[i]==UART_Buffer_CCD[i+1]&&UART_Buffer_CCD[i]!=UART_Buffer_CCD[i-1]&&UART_Buffer_CCD[i]!=UART_Buffer_CCD[i+2])
+		{
+			UART_Buffer_CCD[i]=250;
+			UART_Buffer_CCD[i+1]=250;
+		}
+		if(UART_Buffer_CCD[i]==250&&UART_Buffer_CCD[i]==UART_Buffer_CCD[i+1]&&UART_Buffer_CCD[i]!=UART_Buffer_CCD[i-1]&&UART_Buffer_CCD[i]!=UART_Buffer_CCD[i+2])            
+		{
+			UART_Buffer_CCD[i]=0;
+			UART_Buffer_CCD[i+1]=0;
+		}       
+	}
+}
+
+void Recognize_Road(void)
+{
+	Get_Line();
+	Mid_Pre[0] = Mid_Pre[1];
+	Mid_Pre[1] = Mid_Pre[2];
+	Mid_Pre[2] = Mid;
+	RoadWith_Pre[0] = RoadWith_Pre[1];
+	RoadWith_Pre[1] = RoadWith_Pre[2];
+	RoadWith_Pre[2] = RoadWith;
+	
+	if(Left < 0 && Right < 0 && PixelAverageValue<60) 
+	{
+		road_state = 1;		//全黑
+		
+	}
+	if(Left < 0 && Right < 0 && PixelAverageValue>60)
+	{
+		road_state = 2;		//全白
+	}
+	if(Left > 0 && Right > 0 && PixelAverageValue>60)
+	{
+		road_state = 3;		//没丢线  直道   ?弯道
+		Mid = ( Left + Right ) / 2;
+		RoadWith = (Right - Left) / 2;
+	}
+	if(Left < 0 && Right > 0 && PixelAverageValue>60)
+	{
+		road_state = 4;		//左丢线
+		Mid = Right - RoadWith_Pre[2];
+		RoadWith = RoadWith_Pre[2];
+	}
+	if(Left > 0 && Right < 0 && PixelAverageValue>60)
+	{
+		road_state = 5;		//右丢线
+		Mid = Left + RoadWith_Pre[2];
+		RoadWith = RoadWith_Pre[2];
+	}
+	
+
+	
+	
+
+}
 

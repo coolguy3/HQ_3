@@ -2,6 +2,11 @@
 
 
 struct Quad_PID PID_Stand , PID_Speed , PID_Turn;
+extern struct Parameter{
+	float Stand_Kp , Stand_Kd ;
+	float Speed_Kp , Speed_Ki , Speed_Kd;
+	float Ang_Set , Speed_Set ;
+}	Flash_Parameter;	
 
 void pidInit(struct Quad_PID* pid, float kp,float ki, float kd , float target)
 {
@@ -98,6 +103,20 @@ float PID_Speed_Update()
 	
 	float temp[6] = {0};
 	
+//	if( Speed_Car < 50)
+//	{
+//		PID_Speed.target = 50;
+//	}
+//	else if( Speed_Car < 100)
+//	{
+//		PID_Speed.target = 100;
+//	}
+//	else if( Speed_Car < 150)
+//	{
+//		PID_Speed.target = 150;
+//	}
+
+		
 	PID_Speed.error = PID_Speed.target - Speed_Car;
 	Deta_error = PID_Speed.error - PID_Speed.d_error;
 	
@@ -140,13 +159,13 @@ float PID_Speed_Update()
 
 float PID_Turn_Update()
 {
-  float Line_Now , Line_Last;
+  extern uint8_t Mid_Pre[3]  , Mid;
 	float Deta_error;
 	static float output = 0;
 	
 	float temp[6] = {0};
 	
-	PID_Turn.error = Line_Now - Line_Last;
+	PID_Turn.error = Mid - Mid_Pre[2];
 	Deta_error = PID_Turn.error - PID_Turn.d_error;
 	
 	if( PID_Turn.error < 3000 || PID_Turn.error >-3000 || Deta_error < 3000 || Deta_error > -3000)//比例偏差微分偏差较大不输出，数字实验看曲线定  

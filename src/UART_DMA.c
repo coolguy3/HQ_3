@@ -136,8 +136,8 @@ void CCD_Report(void)
 }
 
 //测试用UART_DMA_CCD_Report发送一直有乱码出现
-void UART_DMA_CCD_Report(void)	//100ms
-{
+//void UART_DMA_CCD_Report(void)	//100ms
+//{
 //	extern uint8_t Pixel[];
 //	uint8_t temp[132] = {0}, i = 0 ;
 //	
@@ -151,4 +151,4 @@ void UART_DMA_CCD_Report(void)	//100ms
 //	while(DMA_IsMajorLoopComplete(DMA_SEND_CH)){;}
 //  UART_SendWithDMA(DMA_SEND_CH, (const uint8_t*)temp, 128 + 4);
 
-}
+//}
