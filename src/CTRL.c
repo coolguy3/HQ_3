@@ -1,11 +1,14 @@
 #include "CTRL.h"
 
 extern struct Quad_PID PID_Stand , PID_Speed , PID_Turn;
-extern struct Parameter{
+extern struct Parameter
+	{
 	float Stand_Kp , Stand_Kd ;
 	float Speed_Kp , Speed_Ki , Speed_Kd;
 	float Ang_Set , Speed_Set ;
-}	Flash_Parameter;	
+	float Turn_Kp , Turn_Kd ;
+}	
+Flash_Parameter;	
 
 //因机械摩擦存在电机死区、宏定义轮子开始转的占空比、需实验测得    竞赛时都取5000 ???
 #define	MOTOT_DEADLINE_LEFT_POS	5500			//加电机死区
@@ -58,6 +61,7 @@ static void PIT0_ISR(void)
 				{
 					//改成跑起来的参数
 					pidInit(&PID_Speed, Flash_Parameter.Speed_Kp , Flash_Parameter.Speed_Ki , Flash_Parameter.Speed_Kd ,Flash_Parameter.Speed_Set);
+					pidInit(&PID_Turn, Flash_Parameter.Turn_Kp , 0 , Flash_Parameter.Turn_Kd , 0);	
 				}	
 				if(Speed_Ctrl_Cnt > 500) Speed_Ctrl_Cnt = 500;
 			}
@@ -91,7 +95,7 @@ static void PIT0_ISR(void)
 				ImageCapture(UART_Buffer_CCD + 2);					//CCD采样程序,函数里有参数需调整
 				CalculateIntegrationTime();		//根据采集的平均电压(代替光强)，反馈计算曝光时间
 				Recognize_Road();
-		//		PID_Turn_Update();
+				PID_Turn_Update();
 				#ifdef __UART_DMA_CCD_Report__
 				CCD_Report();
 				#endif

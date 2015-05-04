@@ -103,20 +103,22 @@ float PID_Speed_Update()
 	
 	float temp[6] = {0};
 	
-//	if( Speed_Car < 50)
-//	{
-//		PID_Speed.target = 50;
-//	}
-//	else if( Speed_Car < 100)
-//	{
-//		PID_Speed.target = 100;
-//	}
-//	else if( Speed_Car < 150)
-//	{
-//		PID_Speed.target = 150;
-//	}
-
-		
+	if(PID_Speed.target > 0)
+	{
+		if( Speed_Car < Flash_Parameter.Speed_Set * 1/3)
+		{
+			PID_Speed.target = Flash_Parameter.Speed_Set * 1/3;
+		}
+		else if( Speed_Car < Flash_Parameter.Speed_Set * 2/3)
+		{
+			PID_Speed.target = Flash_Parameter.Speed_Set * 2/3;
+		}
+		else
+		{
+			PID_Speed.target = Flash_Parameter.Speed_Set;
+		}
+	}
+				
 	PID_Speed.error = PID_Speed.target - Speed_Car;
 	Deta_error = PID_Speed.error - PID_Speed.d_error;
 	
@@ -138,7 +140,6 @@ float PID_Speed_Update()
 	}
 	else
 		PID_Speed.PID_Avg_out = 0;
-	
 	
 	PID_Speed.d_error = PID_Speed.error;
 	PID_Speed.PID_out = PID_Speed.PID_Lastout;
@@ -165,32 +166,32 @@ float PID_Turn_Update()
 	
 	float temp[6] = {0};
 	
-	PID_Turn.error = Mid - Mid_Pre[2];
+	PID_Turn.error = Mid - 64;
 	Deta_error = PID_Turn.error - PID_Turn.d_error;
 	
-	if( PID_Turn.error < 3000 || PID_Turn.error >-3000 || Deta_error < 3000 || Deta_error > -3000)//比例偏差微分偏差较大不输出，数字实验看曲线定  
-	{
+//	if( PID_Turn.error < 8 && PID_Turn.error >-8 && Deta_error < 8 && Deta_error > -8)//比例偏差微分偏差较大不输出，数字实验看曲线定  
+//	{
 		PID_Turn.outP = PID_Turn.Kp * PID_Turn.error;			
-		PID_Turn.outD = PID_Turn.Kd * Deta_error;
+		PID_Turn.outD = PID_Turn.Kd * (Deta_error / 0.015);
 		
 		output =  PID_Turn.outP + PID_Turn.outD ;	
 		PID_Turn.PID_Avg_out = ( output - PID_Turn.PID_Lastout ) / 3.0;
-	}
-	else
-		PID_Turn.PID_Avg_out = 0;
-	
+//	}
+//	else
+//		PID_Turn.PID_Avg_out = 0;
+
 	
 	PID_Turn.d_error = PID_Turn.error;
-	PID_Turn.PID_out = PID_Speed.PID_Lastout;
+	PID_Turn.PID_out = PID_Turn.PID_Lastout;
 	PID_Turn.PID_Lastout = output;
 	
 	#ifdef __UART_DMA_PID_Turn_Report__
-	temp[0] = Line_Now;
-	temp[1] = Line_Last;
+	temp[0] = PID_Turn.error;
+	temp[1] = Deta_error;
 	temp[2] = PID_Turn.outP ;
-	temp[3] = PID_Turn.outI ;
-	temp[4] = PID_Turn.outD ;
-	temp[5] = output;	
+	temp[3] = PID_Turn.outD ;
+	temp[4] = output;	
+	temp[5] = PID_Turn.PID_Avg_out;
 	UART_DMA_Array_Report(sizeof(temp),temp);
 	#endif
 	

@@ -5,9 +5,9 @@ uint8_t UART_Buffer_CCD[132] = {0};	//存放Report的AD值
 uint8_t	Pixel[128] = {0};	//存放采集的AD值
 //中线位置，CCD均值，跳边沿阈值(22-30间)，左右线,赛道宽度
 uint8_t Mid=64,PixelAverageValue,CCD_Threshold=10,RoadWith;
-int16_t Left,Right;
-uint8_t Mid_Pre[3] = {64} , Left_Pre[3] = {0}  , Right_Pre[3] = {0} , RoadWith_Pre[3] = {0} ;
-uint8_t road_state;
+int16_t Left,Right, Left_Pre[3] = {0}  , Right_Pre[3] = {0} ;
+uint8_t Mid_Pre[3] = {64} , RoadWith_Pre[3] = {90} ;
+uint8_t Road_State , Last_Road_State;
 //************求均值**************************
 uint8_t PixelAverage(uint8_t len, uint8_t *data) 
 {
@@ -166,7 +166,7 @@ void Get_Line(void)
 {
 //	extern uint8_t PixelAverageValue;
 //	CCD_Threshold = PixelAverageValue/2-24;
-	uint8_t Maxfind = 33 , i = 0;
+	uint8_t Maxfind = RoadWith_Pre[2]/2 + 10 , i = 0;
 	int16_t Looptmp1 , Looptmp2;
 	
 	//找左线
@@ -180,14 +180,14 @@ void Get_Line(void)
 	}
 	
 	//Maxfind稍大于最近几次赛道宽度
-	if( Mid_Pre[2] - Maxfind > 3)
-	{
-		Looptmp2 = Mid_Pre[2] - Maxfind;
-	}
-	else
-	{
+//	if( Mid_Pre[2] - Maxfind > 3)
+//	{
+//		Looptmp2 = Mid_Pre[2] - Maxfind;
+//	}
+//	else
+//	{
 		Looptmp2 = 3;
-	}
+//	}
 	
 	Left = -1;//检测不到黑线时都为-1
 	for( i = Looptmp1 ; i >= Looptmp2 ; i--)
@@ -217,14 +217,14 @@ void Get_Line(void)
 	}
 	
 	//Maxfind稍大于最近几次赛道宽度的一半
-	if( Mid_Pre[2] + Maxfind < 125)
-	{
-		Looptmp2 = Mid_Pre[2] + Maxfind;
-	}
-	else
-	{
+//	if( Mid_Pre[2] + Maxfind < 125)
+//	{
+//		Looptmp2 = Mid_Pre[2] + Maxfind;
+//	}
+//	else
+//	{
 		Looptmp2 = 125;
-	}
+//	}
 	
 	Right = -1;//检测不到黑线时都为-1
 	for(i = Looptmp1 ; i <= Looptmp2 ; i++)
@@ -297,31 +297,43 @@ void Recognize_Road(void)
 	RoadWith_Pre[1] = RoadWith_Pre[2];
 	RoadWith_Pre[2] = RoadWith;
 	
-	if(Left < 0 && Right < 0 && PixelAverageValue<60) 
+	Last_Road_State = Road_State;
+	if(Left < 0 && Right < 0 && PixelAverageValue<100) 
 	{
-		road_state = 1;		//全黑
-		
+		Road_State = 1;		//全黑
+		if(Last_Road_State == 4)
+		{
+			Mid = Mid_Pre[2] + 0; //数字待定
+			RoadWith = RoadWith_Pre[2];
+		}
+		if(Last_Road_State == 5)
+		{
+			Mid = Mid_Pre[2] - 0; //数字待定
+			RoadWith = RoadWith_Pre[2];
+		}
 	}
-	if(Left < 0 && Right < 0 && PixelAverageValue>60)
+	if(Left < 0 && Right < 0 && PixelAverageValue>100)
 	{
-		road_state = 2;		//全白
+		Road_State = 2;		//全白
+		Mid = Mid_Pre[2];
+		RoadWith = RoadWith_Pre[2];
 	}
 	if(Left > 0 && Right > 0 && PixelAverageValue>60)
 	{
-		road_state = 3;		//没丢线  直道   ?弯道
+		Road_State = 3;		//没丢线  直道   ?弯道
 		Mid = ( Left + Right ) / 2;
-		RoadWith = (Right - Left) / 2;
+		RoadWith = Right - Left;
 	}
 	if(Left < 0 && Right > 0 && PixelAverageValue>60)
 	{
-		road_state = 4;		//左丢线
-		Mid = Right - RoadWith_Pre[2];
+		Road_State = 4;		//左丢线
+		Mid = Right - RoadWith_Pre[2]/2;
 		RoadWith = RoadWith_Pre[2];
 	}
 	if(Left > 0 && Right < 0 && PixelAverageValue>60)
 	{
-		road_state = 5;		//右丢线
-		Mid = Left + RoadWith_Pre[2];
+		Road_State = 5;		//右丢线
+		Mid = Left + RoadWith_Pre[2]/2;
 		RoadWith = RoadWith_Pre[2];
 	}
 	

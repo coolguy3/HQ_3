@@ -450,7 +450,7 @@ void OLED_UI()
 	static int8_t OLED_Show = 0;				//OLED显示的界面号
 	static float * OLED_Adjust = 0;		//存放需要OLED调整的参数的指针
 	float Null = 0;
-	extern uint8_t UART_Buffer_CCD[132],PixelAverageValue,Left,Right,Mid,Mid_Pre[3],road_state;
+	extern uint8_t UART_Buffer_CCD[132],PixelAverageValue,Left,Right,Mid,Mid_Pre[3],Road_State;
 	Key = (enum Key)Key_Scan(!DIP_1);	//第一个拨码开关---0,不支持连续按;1,支持连续按
 	switch(Key)
 	{
@@ -461,8 +461,8 @@ void OLED_UI()
 		case Key_Enter	:	EraseSector(TEST_ADDR_BEIGN);
 											ProgramPage(TEST_ADDR_BEIGN, sizeof(Flash_Parameter), (void*)&Flash_Parameter);		//保存参数到FLASH
 											pidInit(&PID_Stand, Flash_Parameter.Stand_Kp , 0 , Flash_Parameter.Stand_Kd , Flash_Parameter.Ang_Set);	//REset pid各值，并更新参数
-											pidInit(&PID_Speed, 111 , 0.6 , 3.6 ,0);	//直立的速度PID
-											pidInit(&PID_Turn, Flash_Parameter.Turn_Kp , 0 , Flash_Parameter.Turn_Kd , 0);	
+											pidInit(&PID_Speed, 120 , 0.6 , 3.6 ,0);	//直立的速度PID
+											pidInit(&PID_Turn, 0 , 0 , 0 , 0);	
 											Motor_Set_Flag = 1;
 											break;
 		default : DelayMs(10);	 break;	
@@ -472,7 +472,7 @@ void OLED_UI()
 	{
 		//	CCD
 		case 0	:		OLED_P6x8Str(0,0,"AverageValue: ");OLED_Show_Float(13,0,PixelAverageValue);
-								OLED_P6x8Str(0,1,"Road State: ");OLED_Show_Float(11,1,road_state);
+								OLED_P6x8Str(0,1,"Road State: ");OLED_Show_Float(11,1,Road_State);
 								OLED_P6x8Str(0,2,"Left: ");OLED_Show_Float(5,2,Left);
 								OLED_P6x8Str(0,3,"Right: ");OLED_Show_Float(6,3,Right);
 								OLED_P6x8Str(0,4,"Mid: ");OLED_Show_Float(5,4,Mid);
@@ -532,13 +532,12 @@ void OLED_UI()
 								break;	
 		case 11	:		OLED_P6x8Str(0,0,"Turn_PID_Parameter:");
 								OLED_P6x8Str(0*6,1,"Kp: ");	OLED_Show_Float(4,1,Flash_Parameter.Turn_Kp);
-						//		OLED_Adjust = &Flash_Parameter.Turn_Kp;
-								Flash_Parameter.Turn_Kp = 3;
+								OLED_Adjust = &Flash_Parameter.Turn_Kp;
+								
 								break;
 		case 12	:		OLED_P6x8Str(0,0,"Turn_PID_Parameter:");
 								OLED_P6x8Str(0*6,3,"Kd: ");	OLED_Show_Float(4,3,Flash_Parameter.Turn_Kd);
-						//		OLED_Adjust = &Flash_Parameter.Turn_Kd;
-								Flash_Parameter.Turn_Kd = 0.3;
+								OLED_Adjust = &Flash_Parameter.Turn_Kd;
 								break;
 
 	}
