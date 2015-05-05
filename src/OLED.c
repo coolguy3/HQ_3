@@ -460,8 +460,9 @@ void OLED_UI()
 		case Key_Right	: OLED_Show++;	OLED_Fill(0x00);	if(OLED_Show > 12)OLED_Show = 0;			break;
 		case Key_Enter	:	EraseSector(TEST_ADDR_BEIGN);
 											ProgramPage(TEST_ADDR_BEIGN, sizeof(Flash_Parameter), (void*)&Flash_Parameter);		//保存参数到FLASH
+											//用OLED更新参数同时RESET其他值，以免受之前值得影响（比如积分是一直累加的）
 											pidInit(&PID_Stand, Flash_Parameter.Stand_Kp , 0 , Flash_Parameter.Stand_Kd , Flash_Parameter.Ang_Set);	//REset pid各值，并更新参数
-											pidInit(&PID_Speed, 120 , 0.6 , 3.6 ,0);	//直立的速度PID
+											pidInit(&PID_Speed, 130.9 , 2.0 , 6.0 ,0);	//直立的速度PID
 											pidInit(&PID_Turn, 0 , 0 , 0 , 0);	
 											Motor_Set_Flag = 1;
 											break;
@@ -496,6 +497,7 @@ void OLED_UI()
 								break;
 		case 4	:		OLED_P6x8Str(0,0,"Stand_PID_Parameter:");
 								OLED_P6x8Str(0*6,4,"Ang_Set: ");	OLED_Show_Float(10,4,Flash_Parameter.Ang_Set);
+								//Flash_Parameter.Ang_Set = 44;
 								OLED_Adjust = &Flash_Parameter.Ang_Set;								
 								break;
 		
@@ -522,6 +524,7 @@ void OLED_UI()
 		case 9	:		OLED_P6x8Str(0,0,"Speed_PID_Parameter:");
 								OLED_P6x8Str(0*6,4,"Speed_Set: ");	OLED_Show_Float(10,4,Flash_Parameter.Speed_Set);
 								OLED_Adjust = &Flash_Parameter.Speed_Set;
+								//Flash_Parameter.Speed_Set = 80;
 								break;
 								
 		//	转向
@@ -533,11 +536,12 @@ void OLED_UI()
 		case 11	:		OLED_P6x8Str(0,0,"Turn_PID_Parameter:");
 								OLED_P6x8Str(0*6,1,"Kp: ");	OLED_Show_Float(4,1,Flash_Parameter.Turn_Kp);
 								OLED_Adjust = &Flash_Parameter.Turn_Kp;
-								
+								//Flash_Parameter.Turn_Kp = 40;							
 								break;
 		case 12	:		OLED_P6x8Str(0,0,"Turn_PID_Parameter:");
 								OLED_P6x8Str(0*6,3,"Kd: ");	OLED_Show_Float(4,3,Flash_Parameter.Turn_Kd);
 								OLED_Adjust = &Flash_Parameter.Turn_Kd;
+								//Flash_Parameter.Turn_Kd = 10;
 								break;
 
 	}

@@ -11,10 +11,10 @@ extern struct Parameter
 Flash_Parameter;	
 
 //因机械摩擦存在电机死区、宏定义轮子开始转的占空比、需实验测得    竞赛时都取5000 ???
-#define	MOTOT_DEADLINE_LEFT_POS	5500			//加电机死区
-#define	MOTOT_DEADLINE_LEFT_NEG	4500
-#define	MOTOT_DEADLINE_RIGHT_POS	5400
-#define	MOTOT_DEADLINE_RIGHT_NEG	4600
+#define	MOTOT_DEADLINE_LEFT_POS	5300			//加电机死区
+#define	MOTOT_DEADLINE_LEFT_NEG	4300
+#define	MOTOT_DEADLINE_RIGHT_POS	5200
+#define	MOTOT_DEADLINE_RIGHT_NEG	4400
 
 //#define	MOTOT_DEADLINE_LEFT_POS	5000		//不加电机死区
 //#define	MOTOT_DEADLINE_LEFT_NEG	5000
