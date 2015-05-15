@@ -9,6 +9,8 @@ void Key_Init(void)
 	GPIO_QuickInit(HW_GPIOE, 11, kGPIO_Mode_IPU);
 	GPIO_QuickInit(HW_GPIOE, 12, kGPIO_Mode_IPU);
 	
+//	GPIO_QuickInit(HW_GPIOB, 9, kGPIO_Mode_OPP);   //测试中断耗时用
+//	GPIO_ResetBit(HW_GPIOB, 9);
 }
 
 void DIP_Init(void)
@@ -25,7 +27,7 @@ void DIP_Init(void)
 void Bee_Init(void)
 {
 	//蜂鸣器		推挽输出
-	GPIO_QuickInit(HW_GPIOB, 22, kGPIO_Mode_OPP);
+	GPIO_QuickInit(HW_GPIOB, 22, kGPIO_Mode_OOD);
 	GPIO_SetBit(HW_GPIOB, 22);			//关闭蜂鸣器
 
 }

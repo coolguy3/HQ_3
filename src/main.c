@@ -7,10 +7,12 @@
 #include "CTRL.h"
 #include "OLED.h"
 
+extern float Car_Status[6] ;	
 
 	
 int main(void)
 {
+	
 	DelayInit();	
 	FTM_PWM_Encoder_Init();
 	Key_Init();
@@ -32,7 +34,7 @@ int main(void)
 	while(1)
 	{
 		OLED_UI();		//调PID参数界面
-
+		//UART_DMA_Array_Report(sizeof(Car_Status),Car_Status);
 	}	//while end
 	
 }	//main end

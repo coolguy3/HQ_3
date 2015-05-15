@@ -260,10 +260,10 @@ void IMU_Filter(int16_t * GY, int16_t * AX, int16_t * AZ)
 	
 	//»¬¶¯Æ½¾ùÂË²¨ÍÓÂİÒÇYÖá½ÇËÙ¶È
 	Gyro_Filter[num] = * GY;
-	for(i=0;i<10;i++)
+	for(i=0;i<8;i++)
 		 sum += Gyro_Filter[i];
-	Gyro_Y_Filtered = ( sum / 10.0 ) - Gy_Offset;
-	num = (num + 1) % 10;
+	Gyro_Y_Filtered = ( sum / 8.0 ) - Gy_Offset;
+	num = (num + 1) % 8;
 	
 	Acc_X_Filtered = KalmanFilter_x( *AX, KALMAN_Q, KALMAN_R );  // ACC XÖá¿¨¶ûÂüÂË²¨   
 	Acc_Z_Filtered = KalmanFilter_z( *AZ, KALMAN_Q, KALMAN_R );  // ACC ZÖá¿¨¶ûÂüÂË²¨ 

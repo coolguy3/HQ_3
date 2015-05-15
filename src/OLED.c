@@ -447,11 +447,15 @@ void Motor_Test()
 void OLED_UI()
 {
 	extern struct Quad_PID PID_Stand , PID_Speed , PID_Turn;
+	extern float Speed_Car , Ang;
 	static int8_t OLED_Show = 0;				//OLED显示的界面号
-	static float * OLED_Adjust = 0;		//存放需要OLED调整的参数的指针
 	float Null = 0;
-	extern uint8_t UART_Buffer_CCD[132],PixelAverageValue,Left,Right,Mid,Mid_Pre[3],Road_State;
+	static float * OLED_Adjust = 0;		//存放需要OLED调整的参数的指针
+	extern uint8_t UART_Buffer_CCD[132],PixelAverageValue,Left,Right,Road_State,RoadWith;
+	extern float Mid_Filtered,Mid_Pre[3];
 	Key = (enum Key)Key_Scan(!DIP_1);	//第一个拨码开关---0,不支持连续按;1,支持连续按
+	
+	
 	switch(Key)
 	{
 		case Key_Up			:	*OLED_Adjust += 0.1;			break;	
@@ -461,10 +465,13 @@ void OLED_UI()
 		case Key_Enter	:	EraseSector(TEST_ADDR_BEIGN);
 											ProgramPage(TEST_ADDR_BEIGN, sizeof(Flash_Parameter), (void*)&Flash_Parameter);		//保存参数到FLASH
 											//用OLED更新参数同时RESET其他值，以免受之前值得影响（比如积分是一直累加的）
-											pidInit(&PID_Stand, Flash_Parameter.Stand_Kp , 0 , Flash_Parameter.Stand_Kd , Flash_Parameter.Ang_Set);	//REset pid各值，并更新参数
-											pidInit(&PID_Speed, 130.9 , 2.0 , 6.0 ,0);	//直立的速度PID
+//											pidInit(&PID_Stand, 225.5 , 0 , 16.1 , 39.5);	//REset pid各值，并更新参数     39.5调的最终参数
+//											pidInit(&PID_Speed, 40 , 0 , 5.1 ,0);	//直立的速度PID
+											pidInit(&PID_Stand, 225.5 , 0 , 16.1 , 41.1);	//REset pid各值，并更新参数
+											pidInit(&PID_Speed, 40 , 0 , 5.1 ,0);	//直立的速度PID
 											pidInit(&PID_Turn, 0 , 0 , 0 , 0);	
 											Motor_Set_Flag = 1;
+											DelayMs(100);
 											break;
 		default : DelayMs(10);	 break;	
 	}
@@ -476,8 +483,10 @@ void OLED_UI()
 								OLED_P6x8Str(0,1,"Road State: ");OLED_Show_Float(11,1,Road_State);
 								OLED_P6x8Str(0,2,"Left: ");OLED_Show_Float(5,2,Left);
 								OLED_P6x8Str(0,3,"Right: ");OLED_Show_Float(6,3,Right);
-								OLED_P6x8Str(0,4,"Mid: ");OLED_Show_Float(5,4,Mid);
-								OLED_P6x8Str(0,5,"Last Mid: ");OLED_Show_Float(10,5,Mid_Pre[2]);							
+								OLED_P6x8Str(0,4,"Mid: ");OLED_Show_Float(5,4,Mid_Filtered);
+								OLED_P6x8Str(0,5,"Last Mid: ");OLED_Show_Float(10,5,Mid_Pre[2]);
+								OLED_P6x8Str(0,6,"RoadWith: ");OLED_Show_Float(9,6,RoadWith);
+		
 								break;
 		
 		//	角度
@@ -485,6 +494,7 @@ void OLED_UI()
 								OLED_P6x8Str(0*6,1,"Kp: ");	OLED_Show_Float(4,1,Flash_Parameter.Stand_Kp);
 								OLED_P6x8Str(0*6,3,"Kd: ");	OLED_Show_Float(4,3,Flash_Parameter.Stand_Kd);
 								OLED_P6x8Str(0*6,4,"Ang_Set: ");	OLED_Show_Float(10,4,Flash_Parameter.Ang_Set);
+								OLED_P6x8Str(0*6,5,"Ang: ");	OLED_Show_Float(10,5,Ang);
 								OLED_Adjust = &Null;
 								break;	
 		case 2	:		OLED_P6x8Str(0,0,"Stand_PID_Parameter:");
@@ -497,7 +507,7 @@ void OLED_UI()
 								break;
 		case 4	:		OLED_P6x8Str(0,0,"Stand_PID_Parameter:");
 								OLED_P6x8Str(0*6,4,"Ang_Set: ");	OLED_Show_Float(10,4,Flash_Parameter.Ang_Set);
-								//Flash_Parameter.Ang_Set = 44;
+								//Flash_Parameter.Ang_Set = 41;
 								OLED_Adjust = &Flash_Parameter.Ang_Set;								
 								break;
 		
@@ -507,6 +517,7 @@ void OLED_UI()
 								OLED_P6x8Str(0*6,2,"Ki: ");	OLED_Show_Float(4,2,Flash_Parameter.Speed_Ki);
 								OLED_P6x8Str(0*6,3,"Kd: ");	OLED_Show_Float(4,3,Flash_Parameter.Speed_Kd);
 								OLED_P6x8Str(0*6,4,"Speed_Set: ");	OLED_Show_Float(10,4,Flash_Parameter.Speed_Set);
+								OLED_P6x8Str(0*6,5,"Speed : ");	OLED_Show_Float(10,5,Speed_Car);
 								OLED_Adjust = &Null;
 								break;
 		case 6	:		OLED_P6x8Str(0,0,"Speed_PID_Parameter:");
@@ -536,12 +547,12 @@ void OLED_UI()
 		case 11	:		OLED_P6x8Str(0,0,"Turn_PID_Parameter:");
 								OLED_P6x8Str(0*6,1,"Kp: ");	OLED_Show_Float(4,1,Flash_Parameter.Turn_Kp);
 								OLED_Adjust = &Flash_Parameter.Turn_Kp;
-								//Flash_Parameter.Turn_Kp = 40;							
+								//Flash_Parameter.Turn_Kp = 30.5;							
 								break;
 		case 12	:		OLED_P6x8Str(0,0,"Turn_PID_Parameter:");
 								OLED_P6x8Str(0*6,3,"Kd: ");	OLED_Show_Float(4,3,Flash_Parameter.Turn_Kd);
 								OLED_Adjust = &Flash_Parameter.Turn_Kd;
-								//Flash_Parameter.Turn_Kd = 10;
+								//Flash_Parameter.Turn_Kd = 3.1;
 								break;
 
 	}
